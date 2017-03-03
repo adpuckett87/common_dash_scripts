@@ -1,0 +1,41 @@
+#! /bin/sh
+# Script to display important server stats
+#
+# uptime (minutes)
+# cpuX (percent) (X = '', 1, ...)
+# loadavg (percent)
+# cpu_apache2 (percent)
+# cpu_mysqld (percent)
+# mem (bytes)
+# mem_apache2 (bytes)
+# mem_mysqld (bytes)
+# xvdaX_reads (count) (X = '', 1, ...)
+# xvdaX_readtime (ms) (X = '', 1, ...)
+# xvdaX_writes (count) (X = '', 1, ...)
+# xvdaX_writetime (ms) (X = '', 1, ...)
+# xvdaX_used (bytes) (X = 1, 2, ...)
+# ethX_rx (bytes) (X = 0, 1, ...)
+# ethX_tx (bytes) (X = 0, 1, ...)
+# 01/30/17 - Created by Andrew Puckett
+
+echo uptime $(cat /proc/uptime | awk '{print $1}')
+cat /proc/stat | awk '/cpu/ {print$1,($2+$4)*100/($2+$4+$5+$9)}'
+echo loadavg $(cat /proc/loadavg | awk '{print $1}')
+echo cpu_apache2 $(ps -C apache2,httpd -o pcpu | awk '{ sum += $1 } END { print sum }')
+echo cpu_mysqld $(ps -C mysqld -o pcpu | awk '{ sum += $1 } END { print sum }')
+echo mem $(free | awk '/Mem:/ {print $2-$7}')
+echo swap $(free | awk '/Swap:/ {print $3}')
+
+for var in apache2 mysqld; do
+	mem=0;
+	for pid in $(pgrep $var);
+		do mem=$((mem + $(awk '/^Pss:/{ sum += $2 } END { print sum }' /proc/$pid/smaps)));
+	done;
+	echo mem_$var $mem;
+done;
+
+cat /proc/diskstats | awk '/d/ {print $3"_reads " $4"\n" $3"_readtime " $7"\n" $3"_writes " $8"\n" $3"_writetime " $11}'
+
+df | awk '/^\/dev/ {sub("/dev/","",$1); print $1"_used "$3}'
+
+ip -s -o -a link | awk '{sub(":","", $2) } {print $2"_rx " $28"\n" $2"_tx "$43}'

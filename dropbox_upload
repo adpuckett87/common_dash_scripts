@@ -1,0 +1,97 @@
+#!/bin/sh
+# 02/03/17 - Created by Andrew Puckett
+# 03/02/17 - Write to .updated immediately after checking for new files, add support for getopts
+
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+	echo "NAME"
+	echo "	$(basename $0) options"
+	echo
+	echo "DESCRIPTION"
+	echo "	$(basename $0) is used to upload a folder to Dropbox API."
+	echo
+	echo "OPTIONS"
+	echo "	-d"
+	echo "		Directory to upload. Default /var/dropbox"
+	echo "	-o"
+	echo "		Option for Curl without leading -. Default s"
+	echo "	-t"
+	echo "		Prompt for an Authorization Token. Otherwise looks in /etc/dropbox."
+	echo "AUTHOR"
+	echo "	Andrew Puckett"
+	echo
+	exit 1
+fi
+
+CURLOPTS=-s
+DBLOCATION=/var/dropbox
+
+while getopts d:o:t opt
+do
+	case "$opt"
+	in
+		d) DBLOCATION=$OPTARG;;
+		o) CURLOPTS=-$OPTARG;;
+		t) DBTOKEN=1;;
+	esac
+done
+
+[ "$DBTOKEN" = 1 ] && read -p "Token: " DBTOKEN
+[ -n "$DBTOKEN" ] || DBTOKEN=$(cat /etc/dropbox)
+[ -z "$DBTOKEN" ] && echo "ERROR: No Access Token Found." >&2 && exit 1
+
+[ -f $DBLOCATION/.updated ] && FINDTESTS="-newer $DBLOCATION/.updated"
+
+FILES=$(find -L $DBLOCATION -type f $FINDTESTS)
+echo "Uploading $(echo $FILES | wc -w) files to Dropbox" | tee $DBLOCATION/.updated
+
+for FILE in $FILES
+do
+	if [ -n "$(echo "$FILE" | grep "/auth.log$")" ] && [ $(($(date +%M) % 15)) -ne 0 ]; then
+		echo "Skipping $FILE"
+		continue
+	fi
+	if [ -n "$(echo "$FILE" | grep "/syslog$")" ] && [ $(($(date +%M) % 5)) -ne 0 ]; then
+		echo "Skipping $FILE"
+		continue
+	fi
+	SIZE=$(du -b $FILE | cut -f1)
+	DBPATH=$(echo "$FILE" | sed "s@$DBLOCATION@@")
+	MODTIME=$(date -r "$FILE" +"%Y-%m-%dT%H:%M:%SZ")
+	if [ $SIZE -lt 150000000 ]; then
+		curl $CURLOPTS -X POST https://content.dropboxapi.com/2/files/upload \
+				--header "Authorization: Bearer $DBTOKEN" \
+				--header "Dropbox-API-Arg: {\"path\": \"$DBPATH\",\"mode\": \"overwrite\",\"autorename\": false,\"client_modified\": \"$MODTIME\",\"mute\": true}" \
+				--header "Content-Type: application/octet-stream" \
+				--data-binary "@$FILE"
+	else
+		split -b 100m -d "$FILE" "$FILE.part-"
+		PART="$FILE.part-00"
+		SESSION=$(curl $CURLOPTS -X POST https://content.dropboxapi.com/2/files/upload_session/start \
+				--header "Authorization: Bearer $DBTOKEN" \
+				--header "Dropbox-API-Arg: {\"close\": false}" \
+				--header "Content-Type: application/octet-stream" \
+				--data-binary "@$PART")
+		SESSION=$(echo "$SESSION" | awk '{gsub("\"","",$2);sub("}","",$2);} {print $2;}')
+		OFFSET=$(du -b $PART | cut -f1)
+		rm "$PART"
+		for PART in $(find $FILE.part-* | head -n -1)
+		do
+			curl $CURLOPTS -X POST https://content.dropboxapi.com/2/files/upload_session/append_v2 \
+					--header "Authorization: Bearer $DBTOKEN" \
+					--header "Dropbox-API-Arg: {\"cursor\": {\"session_id\": \"$SESSION\",\"offset\": $OFFSET},\"close\": false}" \
+					--header "Content-Type: application/octet-stream" \
+					--data-binary "@$PART"
+			OFFSET=$(($OFFSET+$(du -b $PART | cut -f1)))
+			rm "$PART"
+			echo
+		done
+		PART=$(find $FILE.part-*)
+		curl $CURLOPTS -X POST https://content.dropboxapi.com/2/files/upload_session/finish \
+				--header "Authorization: Bearer $DBTOKEN" \
+				--header "Dropbox-API-Arg: {\"cursor\": {\"session_id\": \"$SESSION\",\"offset\": $OFFSET},\"commit\": {\"path\": \"$DBPATH\",\"mode\": \"overwrite\",\"autorename\": false,\"client_modified\": \"$MODTIME\",\"mute\": true}}" \
+				--header "Content-Type: application/octet-stream" \
+				--data-binary "@$PART"
+		rm "$PART"
+	fi
+	echo
+done

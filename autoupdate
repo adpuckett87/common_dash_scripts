@@ -1,0 +1,38 @@
+#! /bin/sh
+# This is a script made to keep your Ubuntu server up to
+# date placing this script to /etc/cron.weekly/autoupdate
+# This script updates your server automatically and informs
+# you via email if the update was successful or not.
+# 11/03/15 - Change mail to mutt
+# 01/30/17 - Now we check to see if the homepage is equal
+# 02/26/17 - Use curl and more advanced options for homepage checking
+
+SERVER_NAME="$(hostname)"
+LOG_FILE=/var/log/$(basename "$0")_$(date +"%F_%T").log
+
+TEST_PAGE=$(mktemp)
+curl -LSs $SERVER_NAME -o $TEST_PAGE >> $LOG_FILE 2>&1
+
+echo "apt update" >> $LOG_FILE
+apt update >> $LOG_FILE 2>&1
+echo "\napt full-upgrade" >> $LOG_FILE
+apt -y full-upgrade >> $LOG_FILE 2>&1
+echo "\napt clean" >> $LOG_FILE
+apt clean >> $LOG_FILE 2>&1
+
+TEST_PAGE_AFTER=$(mktemp)
+curl -LSs $SERVER_NAME -o $TEST_PAGE_AFTER >> $LOG_FILE 2>&1
+
+cmp -s $TEST_PAGE $TEST_PAGE_AFTER || SAME="y"
+grep -q "E: \|W: " $LOG_FILE && ERRORS="y"
+
+if [ -n "$ERRORS" ]; then
+	mutt -s "ERROR: Upgrade of $SERVER_NAME $(date)" admin@$SERVER_NAME < $LOG_FILE
+elif [ -n "$SAME" ]; then
+	mutt -s "WARNING: Upgrade of $SERVER_NAME completed with different homepage $(date)" admin@$SERVER_NAME < $LOG_FILE
+else
+	mutt -s "SUCCESS: Upgrade $SERVER_NAME $(date)" admin@$SERVER_NAME < $LOG_FILE
+fi
+
+rm -f $TEST_PAGE
+rm -f $TEST_PAGE_AFTER

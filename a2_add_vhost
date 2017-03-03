@@ -1,0 +1,115 @@
+#!/bin/sh
+# 03/03/17 - Created by Andrew Puckett
+
+if [ $# -lt 4 ]; then
+	echo "NAME"
+	echo "	$(basename $0) options"
+	echo
+	echo "DESCRIPTION"
+	echo "	$(basename $0) is used to add a vhost to apache."
+	echo
+	echo "OPTIONS"
+	echo "	-c"
+	echo "		Use certificates."
+	echo "	-d"
+	echo "		Domain. Required."
+	echo "	-i"
+	echo "		Install directory. Optional. If -c is used the key and pem files should be here. The conf file will be copied here as well."
+	echo "	-n"
+	echo "		Name of host. Required."
+	echo
+	echo "AUTHOR"
+	echo "	Andrew Puckett"
+	echo
+	exit 1
+fi
+
+[ $(id -u) != "0" ] && echo "ERROR: You must be the superuser to run this script" >&2 && exit 1
+
+CERT=0
+INSTALL_DIR=.
+CERT_DIR=/etc/ssl/certs
+KEY_DIR=/etc/ssl/private
+ETC_DIR=/etc/apache2/sites-available
+VHOST_DIR=/var/www
+
+while getopts cd:i:n: opt
+do
+	case "$opt"
+	in
+		c) CERT=1;;
+		d) DOMAIN=$OPTARG;;
+		i) INSTALL_DIR=$OPTARG;;
+		n) SHORT_NAME=$OPTARG;;
+	esac
+done
+
+[ -z "$DOMAIN" ] && echo "ERROR: Domain is required." >&2 && exit 1
+[ -z "$SHORT_NAME" ] && echo "ERROR: Name is required." >&2 && exit 1
+
+if [ $CERT -eq 1 ]; then
+	cp --backup=numbered $INSTALL_DIR/$SHORT_NAME.pem $CERT_DIR/$SHORT_NAME.pem
+	cp --backup=numbered $INSTALL_DIR/$SHORT_NAME.key $KEY_DIR/$SHORT_NAME.key
+	chmod 600 $KEY_DIR/$SHORT_NAME.key
+else
+	cp --backup=numbered $CERT_DIR/ssl-cert-snakeoil.pem $CERT_DIR/$SHORT_NAME.pem
+	cp --backup=numbered $KEY_DIR/ssl-cert-snakeoil.key $KEY_DIR/$SHORT_NAME.key
+fi
+
+cat > $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
+<VirtualHost *:80>
+  ServerName $DOMAIN
+  Redirect permanent / https://$DOMAIN/
+  SetEnvIf Request_URI "^/$" dontlog
+ CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log combined env=!dontlog
+</VirtualHost>
+
+<IfModule mod_ssl.c>
+  <VirtualHost *:443>
+    ServerName $DOMAIN
+
+    ServerAdmin admin@$DOMAIN
+    DocumentRoot /var/www/$SHORT_NAME
+
+    ErrorLog \${APACHE_LOG_DIR}/${SHORT_NAME}_error.log
+    CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log combined
+    SSLEngine on
+    SSLCertificateFile	/etc/ssl/certs/$SHORT_NAME.pem
+    SSLCertificateKeyFile /etc/ssl/private/$SHORT_NAME.key
+
+    Options -Indexes
+    RedirectMatch 404 ^/inc|^/core|^/lib|^/conf|^/vendor
+
+    ErrorDocument 400 /400.html
+    ErrorDocument 401 /401.html
+    ErrorDocument 403 /403.html
+    ErrorDocument 404 /404.html
+    ErrorDocument 500 /500.html
+
+    <IfModule mod_expires.c>
+      <FilesMatch "\.(jpe?g|png|gif|js|css|ico)$">
+        ExpiresActive On
+        ExpiresDefault "access plus 1 week"
+      </FilesMatch>
+    </IfModule>
+
+    <FilesMatch "\.(cgi|shtml|phtml|php)$">
+      SSLOptions +StdEnvVars
+    </FilesMatch>
+    <Directory /usr/lib/cgi-bin>
+      SSLOptions +StdEnvVars
+    </Directory>
+    BrowserMatch "MSIE [2-6]" \
+      nokeepalive ssl-unclean-shutdown \
+      downgrade-1.0 force-response-1.0
+    # MSIE 7 and newer should be able to use keepalive
+    BrowserMatch "MSIE [17-9]" ssl-unclean-shutdown
+  </VirtualHost>
+</IfModule>
+EOM
+
+cp --backup=numbered $INSTALL_DIR/$SHORT_NAME.conf $ETC_DIR/$SHORT_NAME.conf
+mkdir -p $VHOST_DIR/$SHORT_NAME
+
+a2ensite $SHORT_NAME
+apachectl configtest

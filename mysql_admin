@@ -1,0 +1,152 @@
+#!/bin/sh
+# 01/19/17 - Created by Andrew Puckett
+# 03/02/17 - Changed to getopts style options and added other improvements, integrated user creation
+
+MYSQL_OPTS="--add-drop-table --add-locks --create-options --dump-date --extended-insert --no-create-db --quick --quote-names --routines --single-transaction --triggers --tz-utc"
+
+if [ $# -lt 4 ]; then
+	echo "NAME"
+	echo "	$(basename $0) options"
+	echo
+	echo "DESCRIPTION"
+	echo "	$(basename $0) is used to perform common command line tasks for MySQL."
+	echo
+	echo "OPTIONS"
+	echo "  Connection"
+	echo "	-f"
+	echo "		Use defaults-file to pass to mysql. Required if -u is not used."
+	echo "	-h"
+	echo "		Host, localhost is used if not present."
+	echo "	-n"
+	echo "		Database name. Required if not present in defaults-file."
+	echo "	-u"
+	echo "		Database user. Required if -f is not used. There will be a prompt for to enter the password."
+	echo
+	echo "  Import/Export"
+	echo "	-b"
+	echo "		Number of backups to keep. Any backups of the database in the directory more than b days old will be removed."
+	echo "	-d"
+	echo "		Directory to use. If not present the current directory is used."
+	echo "	-e"
+	echo "		Export mode. Will export tables to gzip'd files."
+	echo "	-i"
+	echo "		Import mode. Will import gzip'd files."
+	echo "	-o"
+	echo "		Extra options to pass to mysqldump on export. Will be appended to $MYSQL_OPTS. e.g. --no-data"
+	echo "	-r"
+	echo "		Will replace an existing database if present on import."
+	echo
+	echo "  Users"
+	echo "	-c"
+	echo "		Save the new user to the login-path. Only used with -m option"
+	echo "	-l"
+	echo "		Name of Linux user to grant access to users file. Only used with -m option"
+	echo "	-m"
+	echo "		Name of new MySQL user to create."
+	echo
+	echo "AUTHOR"
+	echo "	Andrew Puckett"
+	echo
+	exit 1
+fi
+
+BACKUPS=0
+CONFIG=0
+EXPORT=0
+IMPORT=0
+
+while getopts b:cd:ef:h:il:m:n:o:ru: opt
+do
+	case "$opt"
+	in
+		b) BACKUPS=$OPTARG;;
+		c) CONFIG=1;;
+		d) DIR=$OPTARG;;
+		e) EXPORT=1;;
+		f) FILE=$OPTARG;;
+		h) DB_HOST=$OPTARG;;
+		i) IMPORT=1;;
+		l) USER_NAME=$OPTARG;;
+		m) MYSQL_USER=$OPTARG;;
+		n) DB_NAME=$OPTARG;;
+		o) MYSQL_ADD_OPTS=$OPTARG;;
+		r) REPLACE="IF NOT EXISTS";;
+		u) DB_USER=$OPTARG;;
+	esac
+done
+
+MYSQL_OPTS="--add-drop-table --add-locks --create-options --dump-date --extended-insert --no-create-db --quick --quote-names --routines --single-transaction --triggers --tz-utc $MYSQL_ADD_OPTS"
+[ -n "$DB_HOST" ] || DB_HOST=localhost
+if [ -n "$FILE" ] && [ -f $FILE ]; then
+	CONNECT_STRING="--defaults-file=$FILE"
+else
+	if [ -n "$DB_USER" ]; then
+		mysql_config_editor set --login-path=${DB_HOST}-$DB_USER --host=$DB_HOST --user=$DB_USER --password --skip-warn
+		CONNECT_STRING="--login-path=${DB_HOST}-$DB_USER"
+	else
+		echo "ERROR: You must include either a file with the -f option or a user with the -u option" >&2 && exit 1
+	fi
+fi
+[ -n "$DIR" ] || DIR=.
+
+i=0
+if [ $IMPORT -eq 1 ]; then
+	mysql $CONNECT_STRING -NBA -e "CREATE DATABASE $REPLACE $DB_NAME;" || exit 1
+	echo "Importing separate SQL command files for database '$DB_NAME'"
+
+	for f in $DIR/*
+	do
+		echo "IMPORTING FILE: $f"
+		gunzip -c $f | mysql $CONNECT_STRING $DB_NAME
+		i=$((i+1))
+	done
+
+	echo "$i files imported to database '$DB_NAME'"
+elif [ $EXPORT -eq 1 ]; then
+	EXPORT_DIR="$DIR/${DB_NAME}_mysql_$(date +%Y%m%d%H%M%S)"
+	test -d $EXPORT_DIR || mkdir -p $EXPORT_DIR
+	TABLES=$(mysql $CONNECT_STRING -NBA -D $DB_NAME -e 'SHOW TABLES;') || exit 1
+	echo "Dumping tables into separate SQL command files for database '$DB_NAME' into $EXPORT_DIR"
+
+	for t in $TABLES
+	do 
+		echo "DUMPING TABLE: $DB_NAME.$t"
+		mysqldump $CONNECT_STRING $MYSQL_OPTS $DB_NAME $t | sed -e 's/DEFINER[ ]*=[ ]*`[^*]*`@`[^*]*`/DEFINER=CURRENT_USER/g' | gzip > $EXPORT_DIR/$t.sql.gz
+		i=$((i+1))
+	done
+
+	echo "$i tables dumped from database '$DB_NAME' into $EXPORT_DIR"
+fi
+
+if [ $BACKUPS -gt 0 ]; then
+	find $DIR/${DB_NAME}_mysql_* -type d -mtime +$BACKUPS -exec rm -r {} +
+fi
+
+if [ -n "$MYSQL_USER" ]; then
+	mysql $CONNECT_STRING -NBA -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;" || exit 1
+
+	st=$(stty -g)
+	#trap "stty $st; exit" HUP INT QUIT TERM
+	stty -echo
+	read -p "$MYSQL_USER password: " MYSQL_PASS
+	stty $st
+	echo
+
+	mysql $CONNECT_STRING -NBA -e "CREATE USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASS}'; GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${MYSQL_USER}'@'localhost' WITH GRANT OPTION;"
+	
+	[ $CONFIG ] && mysql_config_editor set --login-path=${DB_HOST}-$MYSQL_USER --host=$DB_HOST --user=$MYSQL_USER --password --skip-warn
+	if [ -w "/etc/mysql" ]; then
+		cat > /etc/mysql/${DB_NAME}-$MYSQL_USER.cnf <<- EOM
+			[client]
+			host=localhost
+			user=$MYSQL_USER
+			password=$MYSQL_PASS
+
+			[mysql]
+			database=$DB_NAME
+		EOM
+
+		[ -n "$USER_NAME" ] && chown $USER_NAME:$USER_NAME /etc/mysql/${DB_NAME}-$MYSQL_USER.cnf
+		chmod 0600 /etc/mysql/${DB_NAME}-$MYSQL_USER.cnf
+	fi
+fi
