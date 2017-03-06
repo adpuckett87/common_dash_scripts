@@ -1,6 +1,7 @@
 #!/bin/sh
 # 02/03/17 - Created by Andrew Puckett
 # 03/02/17 - Write to .updated immediately after checking for new files, add support for getopts
+# 03/06/17 - Zip auth.log and syslog before uploading
 
 if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
 	echo "NAME"
@@ -46,13 +47,13 @@ echo "Uploading $(echo $FILES | wc -w) files to Dropbox" | tee $DBLOCATION/.upda
 
 for FILE in $FILES
 do
-	if [ -n "$(echo "$FILE" | grep "/auth.log$")" ] && [ $(($(date +%M) % 15)) -ne 0 ]; then
+	if [ -n "$(echo "$FILE" | grep -E "/(auth.log|syslog).gz$")" ]; then
 		echo "Skipping $FILE"
 		continue
 	fi
-	if [ -n "$(echo "$FILE" | grep "/syslog$")" ] && [ $(($(date +%M) % 5)) -ne 0 ]; then
-		echo "Skipping $FILE"
-		continue
+	if [ -n "$(echo "$FILE" | grep -E "/(auth.log|syslog)$")" ]; then
+		gzip -c -9 $FILE > $FILE.gz
+		FILE=$FILE.gz
 	fi
 	SIZE=$(du -b $FILE | cut -f1)
 	DBPATH=$(echo "$FILE" | sed "s@$DBLOCATION@@")
