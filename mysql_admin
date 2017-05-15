@@ -4,7 +4,7 @@
 
 MYSQL_OPTS="--add-drop-table --add-locks --create-options --dump-date --extended-insert --no-create-db --quick --quote-names --routines --single-transaction --triggers --tz-utc"
 
-if [ $# -lt 4 ]; then
+if [ $# -lt 2 ]; then
 	echo "NAME"
 	echo "	$(basename $0) options"
 	echo
@@ -87,10 +87,10 @@ else
 		echo "ERROR: You must include either a file with the -f option or a user with the -u option" >&2 && exit 1
 	fi
 fi
-[ -n "$DIR" ] || DIR=.
 
 i=0
 if [ $IMPORT -eq 1 ]; then
+	[ -n "$DIR" ] || DIR=.
 	mysql $CONNECT_STRING -NBA -e "CREATE DATABASE $REPLACE $DB_NAME;" || exit 1
 	echo "Importing separate SQL command files for database '$DB_NAME'"
 
@@ -103,7 +103,9 @@ if [ $IMPORT -eq 1 ]; then
 
 	echo "$i files imported to database '$DB_NAME'"
 elif [ $EXPORT -eq 1 ]; then
-	EXPORT_DIR="$DIR/${DB_NAME}_mysql_$(date +%Y%m%d%H%M%S)"
+	[ -n "$DIR" ] || DIR=.
+	EXPORT_DIR="$DIR"
+	[ "$DIR" = "." ] && EXPORT_DIR="$DIR/${DB_NAME}_mysql_$(date +%Y%m%d%H%M%S)"
 	test -d $EXPORT_DIR || mkdir -p $EXPORT_DIR
 	TABLES=$(mysql $CONNECT_STRING -NBA -D $DB_NAME -e 'SHOW TABLES;') || exit 1
 	echo "Dumping tables into separate SQL command files for database '$DB_NAME' into $EXPORT_DIR"
@@ -119,6 +121,7 @@ elif [ $EXPORT -eq 1 ]; then
 fi
 
 if [ $BACKUPS -gt 0 ]; then
+	[ -n "$DIR" ] || DIR=.
 	find $DIR/${DB_NAME}_mysql_* -type d -mtime +$BACKUPS -exec rm -r {} +
 fi
 

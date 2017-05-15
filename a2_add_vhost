@@ -1,7 +1,7 @@
 #!/bin/sh
 # 03/03/17 - Created by Andrew Puckett
 
-if [ $# -lt 4 ]; then
+if [ $# -lt 2 ]; then
 	echo "NAME"
 	echo "	$(basename $0) options"
 	echo
@@ -61,7 +61,7 @@ cat > $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
   ServerName $DOMAIN
   Redirect permanent / https://$DOMAIN/
   SetEnvIf Request_URI "^/$" dontlog
- CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log combined env=!dontlog
+  CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log combined env=!dontlog
 </VirtualHost>
 
 <IfModule mod_ssl.c>

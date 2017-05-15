@@ -1,6 +1,6 @@
 #! /bin/sh
 # This is a script made to keep your Ubuntu server up to
-# date placing this script to /etc/cron.weekly/autoupdate
+# date placing this script to /etc/cron.weekly/auto_update
 # This script updates your server automatically and informs
 # you via email if the update was successful or not.
 # 11/03/15 - Change mail to mutt
@@ -17,6 +17,8 @@ echo "apt update" >> $LOG_FILE
 apt update >> $LOG_FILE 2>&1
 echo "\napt full-upgrade" >> $LOG_FILE
 apt -y full-upgrade >> $LOG_FILE 2>&1
+echo "\napt autoremove" >> $LOG_FILE
+apt autoremove >> $LOG_FILE 2>&1
 echo "\napt clean" >> $LOG_FILE
 apt clean >> $LOG_FILE 2>&1
 
