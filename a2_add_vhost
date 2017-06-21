@@ -1,5 +1,6 @@
 #!/bin/sh
 # 03/03/17 - Created by Andrew Puckett
+# 06/06/17 - Add redirect for www subdomain
 
 if [ $# -lt 2 ]; then
 	echo "NAME"
@@ -10,13 +11,15 @@ if [ $# -lt 2 ]; then
 	echo
 	echo "OPTIONS"
 	echo "	-c"
-	echo "		Use certificates."
+	echo "	    Use certificates."
 	echo "	-d"
-	echo "		Domain. Required."
+	echo "	    Domain. Required."
 	echo "	-i"
-	echo "		Install directory. Optional. If -c is used the key and pem files should be here. The conf file will be copied here as well."
+	echo "	    Install directory. Optional. If -c is used the key and pem files should be here. The conf file will be copied here as well."
 	echo "	-n"
-	echo "		Name of host. Required."
+	echo "	    Name of host. Required."
+	echo "	-r"
+	echo "	    Redirect to this domain."
 	echo
 	echo "AUTHOR"
 	echo "	Andrew Puckett"
@@ -27,13 +30,14 @@ fi
 [ $(id -u) != "0" ] && echo "ERROR: You must be the superuser to run this script" >&2 && exit 1
 
 CERT=0
+REDIRECT=
 INSTALL_DIR=.
 CERT_DIR=/etc/ssl/certs
 KEY_DIR=/etc/ssl/private
 ETC_DIR=/etc/apache2/sites-available
 VHOST_DIR=/var/www
 
-while getopts cd:i:n: opt
+while getopts cd:i:n:r: opt
 do
 	case "$opt"
 	in
@@ -41,9 +45,11 @@ do
 		d) DOMAIN=$OPTARG;;
 		i) INSTALL_DIR=$OPTARG;;
 		n) SHORT_NAME=$OPTARG;;
+		r) REDIRECT=$OPTARG;;
 	esac
 done
 
+[ -z "$REDIRECT" ] && REDIRECT=$DOMAIN
 [ -z "$DOMAIN" ] && echo "ERROR: Domain is required." >&2 && exit 1
 [ -z "$SHORT_NAME" ] && echo "ERROR: Name is required." >&2 && exit 1
 
@@ -59,57 +65,89 @@ fi
 cat > $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
 <VirtualHost *:80>
   ServerName $DOMAIN
-  Redirect permanent / https://$DOMAIN/
+  ServerAlias www.$DOMAIN
+  Redirect permanent / https://$REDIRECT/
   SetEnvIf Request_URI "^/$" dontlog
   CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log combined env=!dontlog
 </VirtualHost>
 
 <IfModule mod_ssl.c>
   <VirtualHost *:443>
-    ServerName $DOMAIN
-
-    ServerAdmin admin@$DOMAIN
-    DocumentRoot /var/www/$SHORT_NAME
-
-    ErrorLog \${APACHE_LOG_DIR}/${SHORT_NAME}_error.log
-    CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log combined
-    SSLEngine on
-    SSLCertificateFile	/etc/ssl/certs/$SHORT_NAME.pem
-    SSLCertificateKeyFile /etc/ssl/private/$SHORT_NAME.key
-
-    Options -Indexes
-    RedirectMatch 404 ^/inc|^/core|^/lib|^/conf|^/vendor
-
-    ErrorDocument 400 /400.html
-    ErrorDocument 401 /401.html
-    ErrorDocument 403 /403.html
-    ErrorDocument 404 /404.html
-    ErrorDocument 500 /500.html
-
-    <IfModule mod_expires.c>
-      <FilesMatch "\.(jpe?g|png|gif|js|css|ico)$">
-        ExpiresActive On
-        ExpiresDefault "access plus 1 week"
-      </FilesMatch>
-    </IfModule>
-
-    <FilesMatch "\.(cgi|shtml|phtml|php)$">
-      SSLOptions +StdEnvVars
-    </FilesMatch>
-    <Directory /usr/lib/cgi-bin>
-      SSLOptions +StdEnvVars
-    </Directory>
-    BrowserMatch "MSIE [2-6]" \
-      nokeepalive ssl-unclean-shutdown \
-      downgrade-1.0 force-response-1.0
-    # MSIE 7 and newer should be able to use keepalive
-    BrowserMatch "MSIE [17-9]" ssl-unclean-shutdown
-  </VirtualHost>
-</IfModule>
 EOM
 
+if [ "$REDIRECT" = "$DOMAIN" ]; then
+	mkdir -p $VHOST_DIR/$SHORT_NAME
+	cat >> $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
+	    ServerName www.$DOMAIN
+	    SSLEngine on
+	    SSLCertificateFile	$CERT_DIR/$SHORT_NAME.pem
+	    SSLCertificateKeyFile $KEY_DIR/$SHORT_NAME.key
+	    Redirect permanent / https://$REDIRECT/
+	    SetEnvIf Request_URI "^/$" dontlog
+	    CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log combined env=!dontlog
+	  </VirtualHost>
+	  <VirtualHost *:443>
+	    ServerName $DOMAIN
+	    SSLEngine on
+	    SSLCertificateFile	$CERT_DIR/$SHORT_NAME.pem
+	    SSLCertificateKeyFile $KEY_DIR/$SHORT_NAME.key
+
+	    ServerAdmin admin@$DOMAIN
+	    DocumentRoot $VHOST_DIR/$SHORT_NAME
+
+	    ErrorLog \${APACHE_LOG_DIR}/${SHORT_NAME}_error.log
+	    CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log combined
+
+	    FileETag -INode
+	    TraceEnable Off
+	    <Directory $VHOST_DIR/$SHORT_NAME>
+	      Options -Indexes
+	    </Directory>
+	    RedirectMatch 404 ^/inc|^/core|^/lib|^/conf|^/vendor
+
+	    ErrorDocument 400 /error.html?q=400
+	    ErrorDocument 401 /error.html?q=401
+	    ErrorDocument 403 /error.html?q=403
+	    ErrorDocument 404 /error.html?q=404
+	    ErrorDocument 500 /error.html?q=500
+
+	    <IfModule mod_expires.c>
+	      <FilesMatch "\.(jpe?g|png|gif|js|css|ico)$">
+	        ExpiresActive On
+	        ExpiresDefault "access plus 1 week"
+	      </FilesMatch>
+	    </IfModule>
+
+	    <FilesMatch "\.(cgi|shtml|phtml|php)$">
+	      SSLOptions +StdEnvVars
+	    </FilesMatch>
+	    <Directory /usr/lib/cgi-bin>
+	      SSLOptions +StdEnvVars
+	    </Directory>
+	    BrowserMatch "MSIE [2-6]" \
+	      nokeepalive ssl-unclean-shutdown \
+	      downgrade-1.0 force-response-1.0
+	    # MSIE 7 and newer should be able to use keepalive
+	    BrowserMatch "MSIE [17-9]" ssl-unclean-shutdown
+	  </VirtualHost>
+	</IfModule>
+	EOM
+else
+	cat >> $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
+	    ServerName $DOMAIN
+	    ServerAlias www.$DOMAIN
+	    SSLEngine on
+	    SSLCertificateFile	$CERT_DIR/$SHORT_NAME.pem
+	    SSLCertificateKeyFile $KEY_DIR/$SHORT_NAME.key
+	    Redirect permanent / https://$REDIRECT/
+	    SetEnvIf Request_URI "^/$" dontlog
+	    CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log combined env=!dontlog
+	  </VirtualHost>
+	</IfModule>
+	EOM
+fi
+
 cp --backup=numbered $INSTALL_DIR/$SHORT_NAME.conf $ETC_DIR/$SHORT_NAME.conf
-mkdir -p $VHOST_DIR/$SHORT_NAME
 
 a2ensite $SHORT_NAME
 apachectl configtest

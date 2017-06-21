@@ -1,0 +1,30 @@
+#!/bin/sh
+# 06/04/17 - Created by Andrew Puckett
+
+if [ $# -lt 2 ]; then
+	echo "NAME"
+	echo "	$(basename $0) key_path ca_path [days = 3650]"
+	echo
+	echo "DESCRIPTION"
+	echo "	$(basename $0) is used to create certificate/key from a CA."
+	echo
+	echo "AUTHOR"
+	echo "	Andrew Puckett"
+	echo
+	exit 1
+fi
+
+DAYS=3650
+if [ $# -ge 3 ]; then
+	case $3 in
+		*[!0-9]*) echo "$3 is not valid";;
+		*) DAYS=$3;;
+	esac
+fi
+
+openssl genrsa -out $1.key 2048
+openssl req -new -out $1.csr -key $1.key
+openssl x509 -req -in $1.csr -CA $2.crt -CAkey $2.key -CAcreateserial -out $1.crt -days $DAYS
+openssl x509 -in $1.crt -sha1 -noout -fingerprint
+openssl req -outform der -in $1.csr -out $1.csr.der
+openssl rsa -outform der -in $1.key -out $1.key.der
