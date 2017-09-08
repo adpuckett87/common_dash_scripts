@@ -14,11 +14,11 @@ TEST_PAGE=$(mktemp)
 curl -LSs $SERVER_NAME -o $TEST_PAGE >> $LOG_FILE 2>&1
 
 echo "apt update" >> $LOG_FILE
-apt update >> $LOG_FILE 2>&1
+DEBIAN_FRONTEND=noninteractive apt -y update >> $LOG_FILE 2>&1
 echo "\napt full-upgrade" >> $LOG_FILE
-apt -y full-upgrade >> $LOG_FILE 2>&1
+DEBIAN_FRONTEND=noninteractive apt -y full-upgrade >> $LOG_FILE 2>&1
 echo "\napt autoremove" >> $LOG_FILE
-apt autoremove >> $LOG_FILE 2>&1
+apt -y autoremove >> $LOG_FILE 2>&1
 echo "\napt clean" >> $LOG_FILE
 apt clean >> $LOG_FILE 2>&1
 

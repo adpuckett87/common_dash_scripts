@@ -17,7 +17,7 @@ if [ $# -lt 2 ]; then
 	echo "	-i"
 	echo "	    Install directory. Optional. If -c is used the key and pem files should be here. The conf file will be copied here as well."
 	echo "	-n"
-	echo "	    Name of host. Required."
+	echo "	    Name of host (abbreviation). Required."
 	echo "	-r"
 	echo "	    Redirect to this domain."
 	echo
@@ -39,8 +39,7 @@ VHOST_DIR=/var/www
 
 while getopts cd:i:n:r: opt
 do
-	case "$opt"
-	in
+	case "$opt" in
 		c) CERT=1;;
 		d) DOMAIN=$OPTARG;;
 		i) INSTALL_DIR=$OPTARG;;
@@ -68,26 +67,27 @@ cat > $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
   ServerAlias www.$DOMAIN
   Redirect permanent / https://$REDIRECT/
   SetEnvIf Request_URI "^/$" dontlog
-  CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log combined env=!dontlog
+  CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_redirect.log combined env=!dontlog
 </VirtualHost>
 
 <IfModule mod_ssl.c>
   <VirtualHost *:443>
+	    SSLEngine on
+	    SSLCertificateFile	$CERT_DIR/$SHORT_NAME.pem
+	    SSLCertificateKeyFile $KEY_DIR/$SHORT_NAME.key
+	    SetEnvIf Request_URI "^/$" dontlog
+	    CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_redirect.log combined env=!dontlog
 EOM
 
 if [ "$REDIRECT" = "$DOMAIN" ]; then
 	mkdir -p $VHOST_DIR/$SHORT_NAME
 	cat >> $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
 	    ServerName www.$DOMAIN
-	    SSLEngine on
-	    SSLCertificateFile	$CERT_DIR/$SHORT_NAME.pem
-	    SSLCertificateKeyFile $KEY_DIR/$SHORT_NAME.key
 	    Redirect permanent / https://$REDIRECT/
-	    SetEnvIf Request_URI "^/$" dontlog
-	    CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log combined env=!dontlog
 	  </VirtualHost>
 	  <VirtualHost *:443>
 	    ServerName $DOMAIN
+	    UseCanonicalName On
 	    SSLEngine on
 	    SSLCertificateFile	$CERT_DIR/$SHORT_NAME.pem
 	    SSLCertificateKeyFile $KEY_DIR/$SHORT_NAME.key
@@ -95,27 +95,38 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 	    ServerAdmin admin@$DOMAIN
 	    DocumentRoot $VHOST_DIR/$SHORT_NAME
 
+	    LogFormat "%t %D %h \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" $SHORT_NAME
 	    ErrorLog \${APACHE_LOG_DIR}/${SHORT_NAME}_error.log
-	    CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log combined
+	    CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log $SHORT_NAME
 
 	    FileETag -INode
 	    TraceEnable Off
 	    <Directory $VHOST_DIR/$SHORT_NAME>
 	      Options -Indexes
-	    </Directory>
-	    RedirectMatch 404 ^/inc|^/core|^/lib|^/conf|^/vendor
 
-	    ErrorDocument 400 /error.html?q=400
-	    ErrorDocument 401 /error.html?q=401
-	    ErrorDocument 403 /error.html?q=403
-	    ErrorDocument 404 /error.html?q=404
-	    ErrorDocument 500 /error.html?q=500
+	      #RewriteEngine on
+	      #RewriteCond %{REQUEST_FILENAME}\.html -f
+	      #RewriteRule !.*\.html$ %{REQUEST_FILENAME}.html [QSA,L]
+	    </Directory>
+	    #RedirectMatch 404 ^/inc|^/core|^/lib|^/conf|^/vendor
+	    RewriteEngine on
+	    RewriteCond %{DOCUMENT_ROOT}/ext/%{REQUEST_URI}  -f
+	    RewriteRule ^(.+) %{DOCUMENT_ROOT}/ext/\$1  [L]
+	    RewriteCond %{REQUEST_URI} !^/ext/
+	    RewriteRule .* $VHOST_DIR/$SHORT_NAME/lib/_8n/frontcontroller.php [QSA,L]
+
+	    ErrorDocument 400 /400.html
+	    ErrorDocument 401 /401.html
+	    ErrorDocument 403 /403.html
+	    ErrorDocument 404 /404.html
+	    ErrorDocument 500 /500.html
 
 	    <IfModule mod_expires.c>
-	      <FilesMatch "\.(jpe?g|png|gif|js|css|ico)$">
-	        ExpiresActive On
-	        ExpiresDefault "access plus 1 week"
-	      </FilesMatch>
+	      ExpiresActive On
+	      ExpiresDefault "access plus 5 second"
+	      <Directory $VHOST_DIR/$SHORT_NAME/ext>
+	        ExpiresDefault "access plus 1 month"
+	      </Directory>
 	    </IfModule>
 
 	    <FilesMatch "\.(cgi|shtml|phtml|php)$">
@@ -133,12 +144,7 @@ else
 	cat >> $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
 	    ServerName $DOMAIN
 	    ServerAlias www.$DOMAIN
-	    SSLEngine on
-	    SSLCertificateFile	$CERT_DIR/$SHORT_NAME.pem
-	    SSLCertificateKeyFile $KEY_DIR/$SHORT_NAME.key
 	    Redirect permanent / https://$REDIRECT/
-	    SetEnvIf Request_URI "^/$" dontlog
-	    CustomLog \${APACHE_LOG_DIR}/${SHORT_NAME}_access.log combined env=!dontlog
 	  </VirtualHost>
 	</IfModule>
 	EOM

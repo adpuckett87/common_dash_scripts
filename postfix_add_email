@@ -1,0 +1,68 @@
+#!/bin/sh
+# Add Email to Postfix
+# 08/19/17 - Created by Andrew Puckett
+
+if [ $# -lt 2 ]; then
+	echo "NAME"
+	echo "	$(basename $0) options"
+	echo
+	echo "DESCRIPTION"
+	echo "	$(basename $0) is used to add an email address to postfix."
+	echo
+	echo "OPTIONS"
+	echo "	-d"
+	echo "	    Domain. Required."
+	echo "	-e"
+	echo "	    Email address (e.g. firstname). This will be forwarded to admin unless -f is used. Required."
+	echo "	-f"
+	echo "	    Forward the extra email address (e.g. example@gmail.com)."
+	echo "	-p"
+	echo "	    Create a new SMTP password for extra email address."
+	echo
+	echo "AUTHOR"
+	echo "	Andrew Puckett"
+	echo
+	exit 1
+fi
+
+[ $(id -u) != "0" ] && echo "ERROR: You must be the superuser to run this script" >&2 && exit 1
+
+DOMAIN=
+EMAIL=
+FORWARD=
+CREATE_PASS=0
+
+while getopts d:e:f:p opt
+do
+	case "$opt" in
+		d) DOMAIN=$OPTARG;;
+		e) EMAIL=$OPTARG;;
+		f) FORWARD=$OPTARG;;
+		p) CREATE_PASS=1;;
+	esac
+done
+
+[ -n "$FORWARD" ] || FORWARD=admin@$DOMAIN
+
+[ -f /etc/postfix/virtual ] && cat /etc/postfix/virtual > /etc/postfix/virtual_new
+echo $EMAIL@$DOMAIN $FORWARD >> /etc/postfix/virtual_new
+mv --backup=numbered /etc/postfix/virtual_new /etc/postfix/virtual
+postmap /etc/postfix/virtual
+
+if [ $CREATE_PASS -eq 1 ]; then
+	PASS=$(openssl rand -base64 16 | tr / +)
+	echo "####################################################################################################"
+	echo $EMAIL@$DOMAIN password: $PASS
+	echo "####################################################################################################"
+else
+	st=$(stty -g)
+	#trap "stty $st; exit" HUP INT QUIT TERM
+	stty -echo
+	read -p "$EMAIL password: " PASS
+	stty $st
+	echo
+fi
+
+echo $PASS | saslpasswd2 -c -u $DOMAIN $EMAIL -p
+service postfix restart
+systemctl daemon-reload

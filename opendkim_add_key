@@ -1,0 +1,54 @@
+#!/bin/sh
+# Add DKIM key
+# 08/16/17 - Created by Andrew Puckett
+
+if [ $# -lt 2 ]; then
+	echo "NAME"
+	echo "	$(basename $0) options"
+	echo
+	echo "DESCRIPTION"
+	echo "	$(basename $0) is used to add a dkim key to postfix."
+	echo
+	echo "OPTIONS"
+	echo "	-d"
+	echo "	    Domain. Required."
+	echo "	-n"
+	echo "	    Name of host (abbreviation). Required."
+	echo
+	echo "AUTHOR"
+	echo "	Andrew Puckett"
+	echo
+	exit 1
+fi
+
+[ $(id -u) != "0" ] && echo "ERROR: You must be the superuser to run this script" >&2 && exit 1
+
+SHORT_NAME=
+DOMAIN=
+
+while getopts d:n: opt
+do
+	case "$opt" in
+		d) DOMAIN=$OPTARG;;
+		n) SHORT_NAME=$OPTARG;;
+	esac
+done
+
+DKIMNAME=$(echo $SHORT_NAME | tr _ -)
+DKIMNAME=${DKIMNAME}$(date +"%Y%m")
+
+opendkim-genkey -s $DKIMNAME -d $DOMAIN
+mv --backup=numbered ./$DKIMNAME.private /etc/dkimkeys/$DKIMNAME.key
+chmod 0600 /etc/dkimkeys/$DKIMNAME.key
+chown -R opendkim:opendkim /etc/dkimkeys
+
+[ -f /etc/opendkim/key.table ] && cat /etc/opendkim/key.table > /etc/opendkim/key.table_new
+echo "$SHORT_NAME ${DOMAIN}:${DKIMNAME}:/etc/dkimkeys/$DKIMNAME.key" >> /etc/opendkim/key.table_new
+mv --backup=numbered /etc/opendkim/key.table_new /etc/opendkim/key.table
+
+cat ./$DKIMNAME.txt
+
+read -p "Has the public key been added to the DNS [y]?: " CONFIRM
+[ "$CONFIRM" = "y" ] || exit 2
+
+service opendkim reload

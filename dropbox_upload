@@ -28,8 +28,7 @@ DBLOCATION=/var/dropbox
 
 while getopts d:o:t opt
 do
-	case "$opt"
-	in
+	case "$opt" in
 		d) DBLOCATION=$OPTARG;;
 		o) CURLOPTS=-$OPTARG;;
 		t) DBTOKEN=1;;

@@ -1,0 +1,137 @@
+#!/bin/sh
+# 09/07/17 - Created by Andrew Puckett
+
+if [ $# -lt 2 ]; then
+	echo "NAME"
+	echo "	$(basename $0) options"
+	echo
+	echo "DESCRIPTION"
+	echo "	$(basename $0) is used to add a vhost to apache."
+	echo
+	echo "OPTIONS"
+	echo "	-c"
+	echo "	    Use certificates."
+	echo "	-d"
+	echo "	    Domain. Required."
+	echo "	-i"
+	echo "	    Install directory. Optional. If -c is used the key and pem files should be here. The conf file will be copied here as well."
+	echo "	-n"
+	echo "	    Name of host (abbreviation). Required."
+	echo "	-r"
+	echo "	    Redirect to this domain."
+	echo
+	echo "AUTHOR"
+	echo "	Andrew Puckett"
+	echo
+	exit 1
+fi
+
+[ $(id -u) != "0" ] && echo "ERROR: You must be the superuser to run this script" >&2 && exit 1
+
+CERT=0
+REDIRECT=
+INSTALL_DIR=.
+CERT_DIR=/etc/ssl/certs
+KEY_DIR=/etc/ssl/private
+ETC_DIR=/etc/nginx/sites-available
+LOG_DIR=/var/log/nginx
+ENABLED_DIR=/etc/nginx/sites-enabled/
+VHOST_DIR=/var/www
+
+while getopts cd:i:n:r: opt
+do
+	case "$opt" in
+		c) CERT=1;;
+		d) DOMAIN=$OPTARG;;
+		i) INSTALL_DIR=$OPTARG;;
+		n) SHORT_NAME=$OPTARG;;
+		r) REDIRECT=$OPTARG;;
+	esac
+done
+
+[ -z "$REDIRECT" ] && REDIRECT=$DOMAIN
+[ -z "$DOMAIN" ] && echo "ERROR: Domain is required." >&2 && exit 1
+[ -z "$SHORT_NAME" ] && echo "ERROR: Name is required." >&2 && exit 1
+
+if [ $CERT -eq 1 ]; then
+	cp --backup=numbered $INSTALL_DIR/$SHORT_NAME.pem $CERT_DIR/$SHORT_NAME.pem
+	cp --backup=numbered $INSTALL_DIR/$SHORT_NAME.key $KEY_DIR/$SHORT_NAME.key
+	chmod 600 $KEY_DIR/$SHORT_NAME.key
+else
+	cp --backup=numbered $CERT_DIR/ssl-cert-snakeoil.pem $CERT_DIR/$SHORT_NAME.pem
+	cp --backup=numbered $KEY_DIR/ssl-cert-snakeoil.key $KEY_DIR/$SHORT_NAME.key
+fi
+
+cat > $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
+	map \$uri \$loggable {
+	    / 0;
+	    default 1;
+	}
+
+	server {
+	    listen 80; #default_server
+	    server_name $DOMAIN www.$DOMAIN;
+	    access_log $LOG_DIR/${SHORT_NAME}_redirect.log combined if=\$loggable;
+	    return 301 https://$REDIRECT\$request_uri;
+	}
+
+	server {
+	    listen 443 ssl;
+	    ssl_certificate	$CERT_DIR/$SHORT_NAME.pem;
+	    ssl_certificate_key $KEY_DIR/$SHORT_NAME.key;
+	    access_log $LOG_DIR/${SHORT_NAME}_redirect.log combined;
+EOM
+
+if [ "$REDIRECT" = "$DOMAIN" ]; then
+	mkdir -p $VHOST_DIR/$SHORT_NAME
+	cat >> $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
+	    server_name www.$DOMAIN;
+	    return 301 https://$REDIRECT\$request_uri;
+	}
+
+	server {
+	    listen 443 ssl http2; #default_server
+	    server_name $DOMAIN;
+	    ssl_certificate	$CERT_DIR/$SHORT_NAME.pem;
+	    ssl_certificate_key $KEY_DIR/$SHORT_NAME.key;
+	    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+	    expires +30d;
+
+	    root $VHOST_DIR/$SHORT_NAME;
+
+	    #log_format  custom '\$time_local \$request_time \$remote_addr "\$request" \$status  "\$http_referer" "\$http_user_agent"';
+	    error_log $LOG_DIR/${SHORT_NAME}_error.log warn;
+	    access_log $LOG_DIR/${SHORT_NAME}_access.log custom;
+
+	    location = / { try_files /ext/index.html @frontcontroller; }
+	    location / { try_files /ext/\$uri /ext/\$uri.html @frontcontroller; }
+	    location /ext {}
+	    location @frontcontroller {
+	        gzip off;
+	        expires off;
+	        try_files /lib/_8n/frontcontroller.php =404;
+	        fastcgi_pass unix:/run/php/php7.0-fpm.sock;
+	        include fastcgi.conf;
+	        client_max_body_size 8m;
+	    }
+
+	    error_page 400 /ext/400.html;
+	    error_page 401 /ext/401.html;
+	    error_page 403 /ext/403.html;
+	    error_page 404 /ext/404.html;
+	    error_page 500 /ext/500.html;
+	}
+	EOM
+else
+	cat >> $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
+	    server_name  $DOMAIN www.$DOMAIN;
+	    return 301 https://$REDIRECT\$request_uri;
+	}
+	EOM
+fi
+
+cp --backup=numbered $INSTALL_DIR/$SHORT_NAME.conf $ETC_DIR/$SHORT_NAME.conf
+
+ln -sf $ETC_DIR/$SHORT_NAME.conf $ENABLED_DIR
+nginx -t
+echo You may now run sudo service nginx reload
