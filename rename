@@ -1,0 +1,46 @@
+#!/bin/sh
+# 03/01/17 - Created by Andrew Puckett
+
+if [ "$1" = "-h" ] || [ "$1" = "--help" ] || [ $# -lt 1 ]; then
+	echo "NAME"
+	echo "	$(basename $0) options"
+	echo
+	echo "DESCRIPTION"
+	echo "	$(basename $0) is used to rename files in a folder."
+	echo
+	echo "OPTIONS"
+	echo "	-d"
+	echo "		Directory to use. Optional, default is current directory."
+	echo "	-p"
+	echo "		File prefix to remove. Required."
+	echo "AUTHOR"
+	echo "	Andrew Puckett"
+	echo
+	exit 1
+fi
+
+DIR=.
+I=0
+PREFIX=
+
+while getopts d:p: opt
+do
+	case "$opt" in
+		d) DIR=$OPTARG;;
+		p) PREFIX=$OPTARG;;
+	esac
+done
+
+if [ -z "$PREFIX" ]; then
+	echo "You must provide a prefix with the -p option" && exit 1
+fi
+
+IFS="$(printf '\n\t')"
+FILES=$(find $DIR/$PREFIX* -type f)
+for FILE in $FILES
+do
+	mv "$FILE" "$DIR/${FILE#$DIR/$PREFIX}"
+	I=$((I + 1))
+done
+
+echo "Renaming $I files"

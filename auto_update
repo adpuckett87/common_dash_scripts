@@ -8,10 +8,11 @@
 # 02/26/17 - Use curl and more advanced options for homepage checking
 
 SERVER_NAME="$(hostname)"
-LOG_FILE=/var/log/$(basename "$0")_$(date +"%F_%T").log
+FILE_BASE=/var/log/$(basename "$0")_$(date +"%F_%T")
+LOG_FILE=$FILE_BASE.log
 
-TEST_PAGE=$(mktemp)
-curl -LSs $SERVER_NAME -o $TEST_PAGE >> $LOG_FILE 2>&1
+TEST_PAGE=${FILE_BASE}_before.html
+curl -LSs $SERVER_NAME?noStats -o $TEST_PAGE >> $LOG_FILE 2>&1
 
 echo "apt update" >> $LOG_FILE
 DEBIAN_FRONTEND=noninteractive apt -y update >> $LOG_FILE 2>&1
@@ -22,8 +23,8 @@ apt -y autoremove >> $LOG_FILE 2>&1
 echo "\napt clean" >> $LOG_FILE
 apt clean >> $LOG_FILE 2>&1
 
-TEST_PAGE_AFTER=$(mktemp)
-curl -LSs $SERVER_NAME -o $TEST_PAGE_AFTER >> $LOG_FILE 2>&1
+TEST_PAGE_AFTER=${FILE_BASE}_after.html
+curl -LSs $SERVER_NAME?noStats -o $TEST_PAGE_AFTER >> $LOG_FILE 2>&1
 
 cmp -s $TEST_PAGE $TEST_PAGE_AFTER || SAME="y"
 grep -q "E: \|W: " $LOG_FILE && ERRORS="y"
@@ -34,7 +35,6 @@ elif [ -n "$SAME" ]; then
 	mutt -s "WARNING: Upgrade of $SERVER_NAME completed with different homepage $(date)" admin@$SERVER_NAME < $LOG_FILE
 else
 	mutt -s "SUCCESS: Upgrade $SERVER_NAME $(date)" admin@$SERVER_NAME < $LOG_FILE
+	rm -f $TEST_PAGE
+	rm -f $TEST_PAGE_AFTER
 fi
-
-rm -f $TEST_PAGE
-rm -f $TEST_PAGE_AFTER

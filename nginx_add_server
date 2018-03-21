@@ -107,7 +107,6 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 	    location / { try_files /ext/\$uri /ext/\$uri.html @frontcontroller; }
 	    location /ext {}
 	    location @frontcontroller {
-	        gzip off;
 	        expires off;
 	        try_files /lib/_8n/frontcontroller.php =404;
 	        fastcgi_pass unix:/run/php/php7.0-fpm.sock;

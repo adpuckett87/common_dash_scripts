@@ -1,12 +1,25 @@
 #!/bin/sh
 # 06/04/17 - Created by Andrew Puckett
+# 01/04/18 - Added options and ability to create CA
 
-if [ $# -lt 2 ]; then
+if [ $# -lt 1 ]; then
 	echo "NAME"
-	echo "	$(basename $0) key_path ca_path [days = 3650]"
+	echo "	$(basename $0) options"
 	echo
 	echo "DESCRIPTION"
-	echo "	$(basename $0) is used to create certificate/key from a CA."
+	echo "	$(basename $0) is used to create certificate/key from a CA or to create a CA."
+	echo
+	echo "OPTIONS"
+	echo "	-a"
+	echo "	    Certificate authority basename. Required."
+	echo "	-c"
+	echo "	    Certificate basename. Optional, if not present then a certificate authority is created."
+	echo "	-d"
+	echo "	    Days. Optional, if not present 3650 is used."
+	echo "	-p"
+	echo "	    Path. Optional, if not present CD is used."
+	echo "	-s"
+	echo "	    Subject (e.g. '/emailAddress=admin@8-nines.com...]'). Optional, if not present 8-nines default is used."
 	echo
 	echo "AUTHOR"
 	echo "	Andrew Puckett"
@@ -14,17 +27,49 @@ if [ $# -lt 2 ]; then
 	exit 1
 fi
 
+CA=
+CERT=
 DAYS=3650
-if [ $# -ge 3 ]; then
-	case $3 in
-		*[!0-9]*) echo "$3 is not valid";;
-		*) DAYS=$3;;
+DIR=$(pwd)
+DEFAULT_SUBJ='/emailAddress=admin@8-nines.com/C=US/ST=Tennessee/L=Nashville/O=8-nines Consulting, LLC/OU=Home Automation/CN='
+
+while getopts a:c:d:p:s: opt
+do
+	case "$opt" in
+		a) CA=$OPTARG;;
+		c) CERT=$OPTARG;;
+		d) DAYS=$OPTARG;;
+		p) DIR=$OPTARG;;
+		s) SUBJ=$OPTARG;;
 	esac
+done
+
+if [ -z "$CA" ]; then
+	echo "You must provide a CA with the -a option" && exit 1
 fi
 
-openssl genrsa -out $1.key 2048
-openssl req -new -out $1.csr -key $1.key
-openssl x509 -req -in $1.csr -CA $2.crt -CAkey $2.key -CAcreateserial -out $1.crt -days $DAYS
-openssl x509 -in $1.crt -sha1 -noout -fingerprint
-openssl req -outform der -in $1.csr -out $1.csr.der
-openssl rsa -outform der -in $1.key -out $1.key.der
+case $DAYS in
+	*[!0-9]*) echo "$DAYS is not valid" && exit 1;;
+esac
+
+if [ -n "$CERT" ]; then
+	if [ ! -f $DIR/${CA}_ca.crt ]; then
+		echo "Cannot find CA. Check the -a and/or -p options." && exit 1
+	fi
+	if [ -f $DIR/${CA}_ca.srl ]; then
+		SERIAL=-CAserial $DIR/${CA}_ca.srl
+	else
+		SERIAL=-CAcreateserial
+	fi
+	[ -n "$SUBJ" ] || SUBJ=${DEFAULT_SUBJ}$CERT
+	openssl genrsa -out $DIR/$CERT.key 2048
+	openssl req -new -out $DIR/$CERT.csr -key $DIR/$CERT.key -subj "$SUBJ"
+	openssl x509 -req -in $DIR/$CERT.csr -CA $DIR/${CA}_ca.crt -CAkey $DIR/${CA}_ca.key $SERIAL -out $DIR/$CERT.crt -days $DAYS
+	openssl x509 -in $DIR/$CERT.crt -sha1 -noout -fingerprint
+	openssl x509 -outform der -in $DIR/$CERT.crt -out $DIR/$CERT.crt.der
+	openssl rsa -outform der -in $DIR/$CERT.key -out $DIR/$CERT.key.der
+else
+	[ -n "$SUBJ" ] || SUBJ=${DEFAULT_SUBJ}$CA
+	openssl req -new -x509 -days $DAYS -extensions v3_ca -keyout $DIR/${CA}_ca.key -out $DIR/${CA}_ca.crt -subj "$SUBJ"
+	openssl x509 -outform der -in $DIR/$CERT.crt -out $DIR/$CERT.crt.der
+fi
