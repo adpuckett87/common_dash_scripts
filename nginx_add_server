@@ -103,9 +103,10 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 	    error_log $LOG_DIR/${SHORT_NAME}_error.log warn;
 	    access_log $LOG_DIR/${SHORT_NAME}_access.log custom;
 
-	    location = / { try_files /ext/index.html @frontcontroller; }
-	    location / { try_files /ext/\$uri /ext/\$uri.html @frontcontroller; }
+	    location = / { try_files /pub/index.html /ext/index.html @frontcontroller; }
+	    location / { try_files /pub/\$uri /pub/\$uri.html /ext/\$uri @frontcontroller; }
 	    location /ext {}
+	    location /pub {}
 	    location @frontcontroller {
 	        expires off;
 	        try_files /lib/_8n/frontcontroller.php =404;
@@ -114,11 +115,12 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 	        client_max_body_size 8m;
 	    }
 
-	    error_page 400 /ext/400.html;
-	    error_page 401 /ext/401.html;
-	    error_page 403 /ext/403.html;
-	    error_page 404 /ext/404.html;
-	    error_page 500 /ext/500.html;
+	    error_page 400 /400.html;
+	    error_page 401 /401.html;
+	    error_page 403 /403.html;
+	    error_page 404 /404.html;
+	    error_page 500 /500.html;
+	    error_page 502 /502.html;
 	}
 	EOM
 else
