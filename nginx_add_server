@@ -83,7 +83,7 @@ cat > $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
 EOM
 
 if [ "$REDIRECT" = "$DOMAIN" ]; then
-	mkdir -p $VHOST_DIR/$SHORT_NAME
+	mkdir -p $VHOST_DIR/$SHORT_NAME/current
 	cat >> $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
 	    server_name www.$DOMAIN;
 	    return 301 https://$REDIRECT\$request_uri;
@@ -96,8 +96,9 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 	    ssl_certificate_key $KEY_DIR/$SHORT_NAME.key;
 	    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
 	    expires +30d;
+	    client_max_body_size 8m;
 
-	    root $VHOST_DIR/$SHORT_NAME;
+	    root $VHOST_DIR/$SHORT_NAME/current;
 
 	    #log_format  custom '\$time_local \$request_time \$remote_addr "\$request" \$status  "\$http_referer" "\$http_user_agent"';
 	    error_log $LOG_DIR/${SHORT_NAME}_error.log warn;
@@ -112,7 +113,6 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 	        try_files /lib/_8n/frontcontroller.php =404;
 	        fastcgi_pass unix:/run/php/php7.0-fpm.sock;
 	        include fastcgi.conf;
-	        client_max_body_size 8m;
 	    }
 
 	    error_page 400 /400.html;
@@ -121,6 +121,7 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 	    error_page 404 /404.html;
 	    error_page 500 /500.html;
 	    error_page 502 /502.html;
+	    error_page 504 /504.html;
 	}
 	EOM
 else
@@ -135,4 +136,9 @@ cp --backup=numbered $INSTALL_DIR/$SHORT_NAME.conf $ETC_DIR/$SHORT_NAME.conf
 
 ln -sf $ETC_DIR/$SHORT_NAME.conf $ENABLED_DIR
 nginx -t
+if [ $CERT -ne 1 ]; then
+	service nginx reload
+	certbot --nginx certonly && sed -i -e "s#$CERT_DIR/$SHORT_NAME.pem#/etc/letsencrypt/live/$DOMAIN/fullchain.pem#" -e "s#$KEY_DIR/$SHORT_NAME.key#/etc/letsencrypt/live/$DOMAIN/privkey.pem#" $ETC_DIR/$SHORT_NAME.conf
+fi
+
 echo You may now run sudo service nginx reload

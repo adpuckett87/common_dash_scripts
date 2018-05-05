@@ -5,6 +5,7 @@
 # cpuX (seconds) (X = '', 1, ...)
 # loadavg (percent)
 # cpu_apache2 (percent)
+# cpu_clamd (percent)
 # cpu_mysqld (percent)
 # cpu_nginx (percent)
 # cpu_php (percent)
@@ -14,6 +15,7 @@
 # swap (bytes)
 # swap% (percent)
 # mem_apache2 (bytes)
+# mem_clamd (bytes)
 # mem_mysqld (bytes)
 # mem_nginx (bytes)
 # mem_php (bytes)
@@ -33,8 +35,9 @@
 
 cat /proc/uptime | awk '{printf "%-20s %s\n", "uptime", $1}'
 cat /proc/stat | awk '/cpu/ {printf "%-20s %s\n", $1,($2+$4)/100}'
-cat /proc/loadavg | awk '{printf "%-20s %s\n", "loadavg", $1}'
+cat /proc/loadavg | awk '{printf "%-20s %s\n", "loadavg", $1*100}'
 top -n 1 -b | awk 'BEGIN { sum = 0 } /(apache2|httpd)/ { sum += $9 } END { printf "%-20s %s\n", "cpu_apache2", sum }'
+top -n 1 -b | awk 'BEGIN { sum = 0 } /clamd/ { sum += $9 } END { printf "%-20s %s\n", "cpu_clamd", sum }'
 top -n 1 -b | awk 'BEGIN { sum = 0 } /mysqld/ { sum += $9 } END { printf "%-20s %s\n", "cpu_mysqld", sum }'
 top -n 1 -b | awk 'BEGIN { sum = 0 } /nginx/ { sum += $9 } END { printf "%-20s %s\n", "cpu_nginx", sum }'
 top -n 1 -b | awk 'BEGIN { sum = 0 } /php-fpm/ { sum += $9 } END { printf "%-20s %s\n", "cpu_php", sum }'
@@ -43,7 +46,7 @@ free | awk '/Mem:/ {printf "%-20s %s\n%-20s %s\n", "mem", $2-$7, "mem%", 100*($2
 free | awk '/Swap:/ {if($2 != 0){printf "%-20s %s\n%-20s %s\n", "swap", $3, "swap%", 100*$3/$2}}'
 
 if [ $(id -u) = "0" ]; then
-	for var in apache2 mysqld nginx php-fpm master; do
+	for var in apache2 clamd mysqld nginx php-fpm master; do
 		mem=0
 		for pid in $(pgrep $var); do
 			#it's possible that the pid is no longer alive by the time we read it so ignore errors here
