@@ -75,8 +75,7 @@ do
 		SESSION=$(echo "$SESSION" | awk '{gsub("\"","",$2);sub("}","",$2);} {print $2;}')
 		OFFSET=$(du -b $PART | cut -f1)
 		rm "$PART"
-		for PART in $(find $FILE.part-* | head -n -1)
-		do
+		for PART in $(find $FILE.part-* | head -n -1); do
 			curl $CURLOPTS -X POST https://content.dropboxapi.com/2/files/upload_session/append_v2 \
 					--header "Authorization: Bearer $DBTOKEN" \
 					--header "Dropbox-API-Arg: {\"cursor\": {\"session_id\": \"$SESSION\",\"offset\": $OFFSET},\"close\": false}" \

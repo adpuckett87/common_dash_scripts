@@ -106,11 +106,10 @@ fi
 i=0
 if [ $IMPORT -eq 1 ]; then
 	[ -n "$DIR" ] || DIR=.
-	mysql $CONNECT_STRING -NBA -e "CREATE DATABASE $REPLACE $DB_NAME;" || exit 1
+	mysql $CONNECT_STRING -NBA -e "CREATE DATABASE $REPLACE \`$DB_NAME\`;" || exit 1
 	echo "Importing separate SQL command files for database '$DB_NAME'"
 
-	for f in $DIR/*
-	do
+	for f in $DIR/*; do
 		echo "IMPORTING FILE: $f"
 		gunzip -c $f | mysql $CONNECT_STRING $DB_NAME
 		i=$((i+1))
@@ -125,8 +124,7 @@ elif [ $EXPORT -eq 1 ]; then
 	TABLES=$(mysql $CONNECT_STRING -NBA -D $DB_NAME -e 'SHOW TABLES;') || exit 1
 	echo "Dumping tables into separate SQL command files for database '$DB_NAME' into $EXPORT_DIR"
 
-	for t in $TABLES
-	do
+	for t in $TABLES; do
 		echo "DUMPING TABLE: $DB_NAME.$t"
 		mysqldump $CONNECT_STRING $MYSQL_OPTS $DB_NAME $t | sed -e 's/DEFINER[ ]*=[ ]*`[^*]*`@`[^*]*`/DEFINER=CURRENT_USER/g' | gzip > $EXPORT_DIR/$t.sql.gz
 		i=$((i+1))
@@ -179,7 +177,7 @@ if [ -n "$MYSQL_USER" ]; then
 		cat > /etc/cron.daily/mysql_dump_$DB_NAME <<- EOM
 			#! /bin/sh
 			{
-			mysql_admin -e -f /etc/mysql/${DB_NAME}-$MYSQL_USER.cnf -n $DB_NAME -d /var/backups/${DB_NAME}_mysql/\$(date +%Y%m%d%H%M%S) -b 14
+			mysql_admin -e -f /etc/mysql/${DB_NAME}-$MYSQL_USER.cnf -n $DB_NAME -d /var/backups/$DB_NAME/mysql/\$(date +%Y%m%d%H%M%S) -b 14
 			} | logger -t $(basename "$0")
 		EOM
 		chmod +x /etc/cron.daily/mysql_dump_$DB_NAME

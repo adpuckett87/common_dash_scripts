@@ -60,6 +60,7 @@ if [ $CERT -eq 1 ]; then
 else
 	cp --backup=numbered $CERT_DIR/ssl-cert-snakeoil.pem $CERT_DIR/$SHORT_NAME.pem
 	cp --backup=numbered $KEY_DIR/ssl-cert-snakeoil.key $KEY_DIR/$SHORT_NAME.key
+	certbot -d $DOMAIN certonly && ln -sf /etc/letsencrypt/live/$DOMAIN/fullchain.pem $CERT_DIR/$SHORT_NAME.pem && ln -sf /etc/letsencrypt/live/$DOMAIN/privkey.pem $KEY_DIR/$SHORT_NAME.key
 fi
 
 cat > $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
@@ -96,7 +97,7 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 	    ssl_certificate_key $KEY_DIR/$SHORT_NAME.key;
 	    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
 	    expires +30d;
-	    client_max_body_size 8m;
+	    client_max_body_size 20m;
 
 	    root $VHOST_DIR/$SHORT_NAME/current;
 
@@ -136,9 +137,5 @@ cp --backup=numbered $INSTALL_DIR/$SHORT_NAME.conf $ETC_DIR/$SHORT_NAME.conf
 
 ln -sf $ETC_DIR/$SHORT_NAME.conf $ENABLED_DIR
 nginx -t
-if [ $CERT -ne 1 ]; then
-	service nginx reload
-	certbot --nginx certonly && sed -i -e "s#$CERT_DIR/$SHORT_NAME.pem#/etc/letsencrypt/live/$DOMAIN/fullchain.pem#" -e "s#$KEY_DIR/$SHORT_NAME.key#/etc/letsencrypt/live/$DOMAIN/privkey.pem#" $ETC_DIR/$SHORT_NAME.conf
-fi
 
 echo You may now run sudo service nginx reload
