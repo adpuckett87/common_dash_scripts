@@ -12,7 +12,9 @@ if [ "$1" = "-h" ] || [ "$1" = "--help" ] || [ $# -lt 1 ]; then
 	echo "	-d"
 	echo "		Directory to use. Optional, default is current directory."
 	echo "	-p"
-	echo "		File prefix to remove. Required."
+	echo "		File prefix to remove. Either this or -q is required."
+	echo "	-q"
+	echo "		File postfix to remove. Either this or -p is required."
 	echo "AUTHOR"
 	echo "	Andrew Puckett"
 	echo
@@ -22,24 +24,31 @@ fi
 DIR=.
 I=0
 PREFIX=
+POSTFIX=
 
-while getopts d:p: opt
+while getopts d:p:q: opt
 do
 	case "$opt" in
 		d) DIR=$OPTARG;;
 		p) PREFIX=$OPTARG;;
+		q) POSTFIX=$OPTARG;;
 	esac
 done
 
-if [ -z "$PREFIX" ]; then
-	echo "You must provide a prefix with the -p option" && exit 1
+if [ -z "$PREFIX" ] && [ -z "$POSTFIX" ]; then
+	echo "You must provide a prefix or postfix with the -p or -q option" && exit 1
 fi
 
 IFS="$(printf '\n\t')"
 FILES=$(find $DIR/$PREFIX* -type f)
 for FILE in $FILES
 do
-	mv "$FILE" "$DIR/${FILE#$DIR/$PREFIX}"
+	if [ -z "$PREFIX" ]; then
+		#only removes from the very end
+		mv "$FILE" "$DIR/${FILE%$POSTFIX}"
+	else
+		mv "$FILE" "$DIR/${FILE#$DIR/$PREFIX}"
+	fi
 	I=$((I + 1))
 done
 

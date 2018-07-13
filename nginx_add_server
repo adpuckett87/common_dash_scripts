@@ -69,6 +69,11 @@ cat > $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
 	    default 1;
 	}
 
+	map \$http_accept \$extension {
+	    application/json json;
+	    default html;
+	}
+
 	server {
 	    listen 80; #default_server
 	    server_name $DOMAIN www.$DOMAIN;
@@ -92,7 +97,7 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 
 	server {
 	    listen 443 ssl http2; #default_server
-	    server_name $DOMAIN;
+	    server_name $DOMAIN portal.$DOMAIN origin.$DOMAIN;
 	    ssl_certificate	$CERT_DIR/$SHORT_NAME.pem;
 	    ssl_certificate_key $KEY_DIR/$SHORT_NAME.key;
 	    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
@@ -116,13 +121,23 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 	        include fastcgi.conf;
 	    }
 
-	    error_page 400 /400.html;
-	    error_page 401 /401.html;
-	    error_page 403 /403.html;
-	    error_page 404 /404.html;
-	    error_page 500 /500.html;
-	    error_page 502 /502.html;
-	    error_page 504 /504.html;
+	    error_page 400 /400;
+	    error_page 401 /401;
+	    error_page 403 /403;
+	    error_page 404 /404;
+	    error_page 413 /413;
+	    error_page 500 /500;
+	    error_page 502 /502;
+	    error_page 504 /504;
+
+	    location = /400 { try_files /pub/400.\$extension /ext/400.\$extension; }
+	    location = /401 { try_files /pub/401.\$extension /ext/401.\$extension; }
+	    location = /403 { try_files /pub/403.\$extension /ext/403.\$extension; }
+	    location = /404 { try_files /pub/404.\$extension /ext/404.\$extension; }
+	    location = /413 { try_files /pub/413.\$extension /ext/413.\$extension; }
+	    location = /500 { try_files /pub/500.\$extension /ext/500.\$extension; }
+	    location = /502 { try_files /pub/502.\$extension /ext/502.\$extension; }
+	    location = /504 { try_files /pub/504.\$extension /ext/504.\$extension; }
 	}
 	EOM
 else
