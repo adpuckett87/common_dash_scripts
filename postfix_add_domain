@@ -38,8 +38,6 @@ do
 	esac
 done
 
-MAIL_DOMAIN=$(echo "mail.$DOMAIN" | awk '{sub("mail.dev.","dev.mail.",$0)} {print $0}')
-
 [ -f /etc/opendkim/signing.table ] && cat /etc/opendkim/signing.table > /etc/opendkim/signing.table_new
 echo "*@$DOMAIN $SHORT_NAME" >> /etc/opendkim/signing.table_new
 mv --backup=numbered /etc/opendkim/signing.table_new /etc/opendkim/signing.table

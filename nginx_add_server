@@ -15,8 +15,12 @@ if [ $# -lt 2 ]; then
 	echo "	    Domain. Required."
 	echo "	-i"
 	echo "	    Install directory. Optional. If -c is used the key and pem files should be here. The conf file will be copied here as well."
+	echo "	-m"
+	echo "	    Manual challenge. Can be used when DNS is pointed to the server yet."
 	echo "	-n"
 	echo "	    Name of host (abbreviation). Required."
+	echo "	-o"
+	echo "	    Origin certificate instead of apex, used with CDNs."
 	echo "	-r"
 	echo "	    Redirect to this domain."
 	echo
@@ -29,8 +33,10 @@ fi
 [ $(id -u) != "0" ] && echo "ERROR: You must be the superuser to run this script" >&2 && exit 1
 
 CERT=0
+ORIGIN_CERT=0
 REDIRECT=
 INSTALL_DIR=.
+CHALLENGE=--nginx
 CERT_DIR=/etc/ssl/certs
 KEY_DIR=/etc/ssl/private
 ETC_DIR=/etc/nginx/sites-available
@@ -38,13 +44,15 @@ LOG_DIR=/var/log/nginx
 ENABLED_DIR=/etc/nginx/sites-enabled/
 VHOST_DIR=/var/www
 
-while getopts cd:i:n:r: opt
+while getopts cd:i:mn:or: opt
 do
 	case "$opt" in
 		c) CERT=1;;
 		d) DOMAIN=$OPTARG;;
 		i) INSTALL_DIR=$OPTARG;;
+		m) CHALLENGE=--manual;;
 		n) SHORT_NAME=$OPTARG;;
+		o) ORIGIN_CERT=1;;
 		r) REDIRECT=$OPTARG;;
 	esac
 done
@@ -60,7 +68,11 @@ if [ $CERT -eq 1 ]; then
 else
 	cp --backup=numbered $CERT_DIR/ssl-cert-snakeoil.pem $CERT_DIR/$SHORT_NAME.pem
 	cp --backup=numbered $KEY_DIR/ssl-cert-snakeoil.key $KEY_DIR/$SHORT_NAME.key
-	certbot -d $DOMAIN certonly && ln -sf /etc/letsencrypt/live/$DOMAIN/fullchain.pem $CERT_DIR/$SHORT_NAME.pem && ln -sf /etc/letsencrypt/live/$DOMAIN/privkey.pem $KEY_DIR/$SHORT_NAME.key
+	if [ $ORIGIN_CERT -eq 1 ]; then
+		certbot $CHALLENGE -d origin.$DOMAIN -d www.$DOMAIN certonly && ln -sf /etc/letsencrypt/live/origin.$DOMAIN/fullchain.pem $CERT_DIR/$SHORT_NAME.pem && ln -sf /etc/letsencrypt/live/origin.$DOMAIN/privkey.pem $KEY_DIR/$SHORT_NAME.key
+	else
+		certbot $CHALLENGE -d $DOMAIN -d www.$DOMAIN certonly && ln -sf /etc/letsencrypt/live/$DOMAIN/fullchain.pem $CERT_DIR/$SHORT_NAME.pem && ln -sf /etc/letsencrypt/live/$DOMAIN/privkey.pem $KEY_DIR/$SHORT_NAME.key
+	fi
 fi
 
 cat > $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
@@ -76,7 +88,7 @@ cat > $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
 
 	server {
 	    listen 80; #default_server
-	    server_name $DOMAIN www.$DOMAIN;
+	    server_name $DOMAIN www.$DOMAIN portal.$DOMAIN origin.$DOMAIN;
 	    access_log $LOG_DIR/${SHORT_NAME}_redirect.log combined if=\$loggable;
 	    return 301 https://$REDIRECT\$request_uri;
 	}
@@ -117,7 +129,7 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 	    location @frontcontroller {
 	        expires off;
 	        try_files /lib/_8n/frontcontroller.php =404;
-	        fastcgi_pass unix:/run/php/php7.0-fpm.sock;
+	        fastcgi_pass unix:/run/php/php7.2-fpm.sock;
 	        include fastcgi.conf;
 	    }
 
@@ -151,6 +163,4 @@ fi
 cp --backup=numbered $INSTALL_DIR/$SHORT_NAME.conf $ETC_DIR/$SHORT_NAME.conf
 
 ln -sf $ETC_DIR/$SHORT_NAME.conf $ENABLED_DIR
-nginx -t
-
-echo You may now run sudo service nginx reload
+nginx -t && echo You may now run sudo service nginx reload
