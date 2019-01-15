@@ -62,7 +62,7 @@ else
 	echo Run as root for additional data >&2
 fi
 
-cat /proc/diskstats | awk '/d/ {printf "%-20s %s\n%-20s %s\n%-20s %s\n%-20s %s\n", $3"_reads", $4, $3"_readtime", $7, $3"_writes", $8, $3"_writetime", $11}'
+cat /proc/diskstats | awk '/d|nvm/ {printf "%-20s %s\n%-20s %s\n%-20s %s\n%-20s %s\n", $3"_reads", $4, $3"_readtime", $7, $3"_writes", $8, $3"_writetime", $11}'
 
 df | awk '/^\/dev/ {sub("/dev/","",$1);sub("%","",$5); printf "%-20s %s\n%-20s %s\n", $1"_used", $3*1024, $1"_used%", $5}'
 

@@ -64,5 +64,7 @@ else
 fi
 
 echo $PASS | saslpasswd2 -c -u $DOMAIN $EMAIL -p
+cp /etc/sasldb2 /var/run/postfix/etc/
+chown postfix:postfix /var/run/postfix/etc/sasldb2
 service postfix restart
 systemctl daemon-reload
