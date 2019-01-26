@@ -33,7 +33,7 @@ fi
 [ $(id -u) != "0" ] && echo "ERROR: You must be the superuser to run this script" >&2 && exit 1
 
 CERT=0
-ORIGIN_CERT=0
+ORIGIN=
 REDIRECT=
 INSTALL_DIR=.
 CHALLENGE=--nginx
@@ -52,7 +52,7 @@ do
 		i) INSTALL_DIR=$OPTARG;;
 		m) CHALLENGE=--manual;;
 		n) SHORT_NAME=$OPTARG;;
-		o) ORIGIN_CERT=1;;
+		o) ORIGIN=origin.;;
 		r) REDIRECT=$OPTARG;;
 	esac
 done
@@ -68,10 +68,10 @@ if [ $CERT -eq 1 ]; then
 else
 	cp --backup=numbered $CERT_DIR/ssl-cert-snakeoil.pem $CERT_DIR/$SHORT_NAME.pem
 	cp --backup=numbered $KEY_DIR/ssl-cert-snakeoil.key $KEY_DIR/$SHORT_NAME.key
-	if [ $ORIGIN_CERT -eq 1 ]; then
-		certbot $CHALLENGE -d origin.$DOMAIN -d www.$DOMAIN certonly && ln -sf /etc/letsencrypt/live/origin.$DOMAIN/fullchain.pem $CERT_DIR/$SHORT_NAME.pem && ln -sf /etc/letsencrypt/live/origin.$DOMAIN/privkey.pem $KEY_DIR/$SHORT_NAME.key
-	else
-		certbot $CHALLENGE -d $DOMAIN -d www.$DOMAIN certonly && ln -sf /etc/letsencrypt/live/$DOMAIN/fullchain.pem $CERT_DIR/$SHORT_NAME.pem && ln -sf /etc/letsencrypt/live/$DOMAIN/privkey.pem $KEY_DIR/$SHORT_NAME.key
+	certbot $CHALLENGE -d $ORIGIN$DOMAIN -d www.$DOMAIN certonly && ln -sf /etc/letsencrypt/live/$ORIGIN$DOMAIN/fullchain.pem $CERT_DIR/$SHORT_NAME.pem && ln -sf /etc/letsencrypt/live/$ORIGIN$DOMAIN/privkey.pem $KEY_DIR/$SHORT_NAME.key
+	if [ "$CHALLENGE" = "--manual" ]; then
+		sed -i "s/authenticator = manual/authenticator = nginx/" /etc/letsencrypt/renewal/$ORIGIN$DOMAIN.conf
+		sed -i "s/manual_public_ip_logging_ok = True/installer = nginx/" /etc/letsencrypt/renewal/$ORIGIN$DOMAIN.conf
 	fi
 fi
 
