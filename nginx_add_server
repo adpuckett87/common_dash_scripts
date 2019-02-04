@@ -95,7 +95,7 @@ cat > $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
 
 	server {
 	    listen 443 ssl;
-	    ssl_certificate	$CERT_DIR/$SHORT_NAME.pem;
+	    ssl_certificate $CERT_DIR/$SHORT_NAME.pem;
 	    ssl_certificate_key $KEY_DIR/$SHORT_NAME.key;
 	    access_log $LOG_DIR/${SHORT_NAME}_redirect.log combined;
 EOM
@@ -110,7 +110,7 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 	server {
 	    listen 443 ssl http2; #default_server
 	    server_name $DOMAIN portal.$DOMAIN origin.$DOMAIN;
-	    ssl_certificate	$CERT_DIR/$SHORT_NAME.pem;
+	    ssl_certificate $CERT_DIR/$SHORT_NAME.pem;
 	    ssl_certificate_key $KEY_DIR/$SHORT_NAME.key;
 	    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
 	    expires +30d;

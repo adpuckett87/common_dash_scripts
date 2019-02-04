@@ -2,6 +2,7 @@
 # 02/03/17 - Created by Andrew Puckett
 # 03/02/17 - Write to .updated immediately after checking for new files, add support for getopts
 # 03/06/17 - Zip auth.log and syslog before uploading
+# 02/03/19 - Skip journal logs
 
 if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
 	echo "NAME"
@@ -47,7 +48,7 @@ echo "Uploading $(echo $FILES | wc -w) files to Dropbox" | tee $DBLOCATION/.upda
 IFS="$(printf '\n\t')"
 for FILE in $FILES
 do
-	if [ -n "$(echo "$FILE" | grep -E "/(auth.log|syslog).gz$")" ]; then
+	if [ -n "$(echo "$FILE" | grep -E "(/(auth.log|syslog).gz$)|$DBLOCATION/log/journal/")" ]; then
 		echo "Skipping $FILE"
 		continue
 	fi
