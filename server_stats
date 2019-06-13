@@ -32,6 +32,25 @@
 # 06/06/17 - Added mem% and dev% and cleaned up code
 # 09/08/17 - Added nginx, php and postfix
 # 04/14/18 - Made CPU measurements real-time
+# 05/30/19 - Added -q and -e options for daily email report
+
+if [ "$1" = "-q" ]; then
+	[ $(cat /proc/loadavg | awk '{printf "%s > 0.1\n", $1}' | bc) = "1" ] && exit 1
+	MEM=$(free | awk '/Mem:/ {print 100*($2-$7)/$2}')
+	SWAP=$(free | awk '/Swap:/ {if($2 != 0){print 100*$3/$2}}')
+	[ $(echo "$MEM > 90" | bc) = "1" ] && exit 1
+	[ -n "$SWAP" ] && [ $(echo "$SWAP > 90" | bc) = "1" ] && exit 1
+	[ -n "$SWAP" ] && [ $(echo "$MEM > 80 && $SWAP > 80" | bc) = "1" ] && exit 1
+	[ $(df | awk '/^\/dev/ {if(index($1, "loop") == 0){sub("%","",$5);printf "%s > 75\n", $5}}' | bc) = "1" ] && exit 1
+	exit 0
+fi
+
+if [ "$1" = "-e" ]; then
+	cat /proc/loadavg | awk '{printf "%-20s %s\n", "loadavg", $1*100}'
+	free | awk '/Mem:/ {printf "%-20s %s\n", "mem%", 100*($2-$7)/$2}'
+	free | awk '/Swap:/ {if($2 != 0){printf "%-20s %s\n", "swap%", 100*$3/$2}}'
+	df | awk '/^\/dev/ {if(index($1, "loop") == 0){sub("/dev/","",$1);sub("%","",$5);printf "%-20s %s\n\n", $1"_used%", $5}}'
+fi
 
 cat /proc/uptime | awk '{printf "%-20s %s\n", "uptime", $1}'
 cat /proc/stat | awk '/cpu/ {printf "%-20s %s\n", $1,($2+$4)/100}'
