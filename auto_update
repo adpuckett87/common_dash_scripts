@@ -19,7 +19,7 @@ DEBIAN_FRONTEND=noninteractive apt -y update >> $LOG_FILE 2>&1
 echo "\napt full-upgrade" >> $LOG_FILE
 DEBIAN_FRONTEND=noninteractive apt -y full-upgrade >> $LOG_FILE 2>&1
 echo "\napt autoremove" >> $LOG_FILE
-apt -y autoremove >> $LOG_FILE 2>&1
+DEBIAN_FRONTEND=noninteractive apt -y autoremove >> $LOG_FILE 2>&1
 echo "\napt clean" >> $LOG_FILE
 apt clean >> $LOG_FILE 2>&1
 

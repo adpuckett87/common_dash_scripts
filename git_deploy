@@ -63,6 +63,6 @@ if [ "$CONFIRM" = "y" ]; then
 fi
 read -p "Would you like to go back (y)? " CONFIRM
 if [ "$CONFIRM" = "y" ]; then
-	ln -snf $VHOST_DIR/$SHORT_NAME/$OLD_CURRENT_EXT $VHOST_DIR/$SHORT_NAME/current/ext
-	ln -snf $VHOST_DIR/$SHORT_NAME/$OLD_CURRENT_LIB $VHOST_DIR/$SHORT_NAME/current/lib
+	ln -snf $OLD_CURRENT_EXT $VHOST_DIR/$SHORT_NAME/current/ext
+	ln -snf $OLD_CURRENT_LIB $VHOST_DIR/$SHORT_NAME/current/lib
 fi
