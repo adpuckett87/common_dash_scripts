@@ -3,4 +3,4 @@
 STDIN=$(cat)
 DOMAIN=$(echo "$STDIN" | awk '/Return-Path: / { i++ }  i > 1 && j < 1 { split($2,a,"@"); sub(">","",a[2]); print a[2]; j++ }')
 SHORT_NAME=$(grep "^$DOMAIN " /etc/postfix/virtual | cut -d' ' -f2)
-echo "$STDIN" | php /var/www/$SHORT_NAME/current/lib/_8n/emailmarketing/controllers/bounces.php
+echo "$STDIN" | php /var/www/$SHORT_NAME/current/lib/_8n/emailmarketing/controllers/bounce.php

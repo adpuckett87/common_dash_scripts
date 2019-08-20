@@ -68,6 +68,9 @@ else
 		esac
 	done
 	echo no-reply@$DOMAIN devnull@localhost >> /etc/postfix/virtual_new
+	echo listunsubscribe@$DOMAIN listunsubscribe-$SHORT_NAME@localhost >> /etc/postfix/virtual_new
+	echo "listunsubscribe-$SHORT_NAME: \"| php /var/www/$SHORT_NAME/current/lib/_8n/emailmarketing/controllers/listunsubscribe.php\"" >> /etc/aliases
+	newaliases
 fi
 
 [ -n "$ADMIN_EMAIL" ] && echo admin@$DOMAIN $ADMIN_EMAIL >> /etc/postfix/virtual_new
