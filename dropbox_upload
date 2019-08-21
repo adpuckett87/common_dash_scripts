@@ -46,8 +46,7 @@ FILES=$(find -L $DBLOCATION -type f $FINDTESTS)
 echo "Uploading $(echo $FILES | wc -w) files to Dropbox" | tee $DBLOCATION/.updated
 
 IFS="$(printf '\n\t')"
-for FILE in $FILES
-do
+for FILE in $FILES; do
 	if [ -n "$(echo "$FILE" | grep -E "(/(auth.log|syslog).gz$)|$DBLOCATION/log/journal/")" ]; then
 		echo "Skipping $FILE"
 		continue

@@ -1,0 +1,17 @@
+#! /bin/sh
+
+VHOST_DIR=/var/www
+
+SITES=$(find /var/www -maxdepth 1 -mindepth 1 -type d ! -name "*-dev" | sort)
+
+for SITE in $SITES; do
+	VERSIONS=$(ls -I current $SITE | wc -w)
+	GIT_DIR=$SITE/$(ls -I current -t $SITE | head -1)
+	echo "----------------------------------------------------------------------------------------------------"
+	echo $SITE - $VERSIONS
+	if [ $VERSIONS -gt 0 ]; then
+		git --git-dir=$GIT_DIR/.git --work-tree=$GIT_DIR log -1
+		git --git-dir=$GIT_DIR/.git --work-tree=$GIT_DIR status -s
+	fi
+	echo "----------------------------------------------------------------------------------------------------"
+done
