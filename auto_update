@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 # This is a script made to keep your Ubuntu server up to
 # date placing this script to /etc/cron.weekly/auto_update
 # This script updates your server automatically and informs

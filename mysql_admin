@@ -169,13 +169,13 @@ if [ -n "$MYSQL_USER" ]; then
 			database=$DB_NAME
 		EOM
 
-		[ -n "$USER_NAME" ] && chown $USER_NAME:$USER_NAME /etc/mysql/${DB_NAME}-$MYSQL_USER.cnf
-		chmod 0600 /etc/mysql/${DB_NAME}-$MYSQL_USER.cnf
+		[ -n "$USER_NAME" ] && chown www-data:$USER_NAME /etc/mysql/${DB_NAME}-$MYSQL_USER.cnf
+		chmod 0440 /etc/mysql/${DB_NAME}-$MYSQL_USER.cnf
 	fi
 
 	if [ $CRON -eq 1 ]; then
 		cat > /etc/cron.daily/mysql_dump_$DB_NAME <<- EOM
-			#! /bin/sh
+			#!/bin/sh
 			{
 			mysql_admin -e -f /etc/mysql/${DB_NAME}-$MYSQL_USER.cnf -n $DB_NAME -d /var/backups/$DB_NAME/mysql/\$(date +%Y%m%d%H%M%S) -b 14
 			} | logger -t $(basename "$0")
