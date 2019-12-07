@@ -48,10 +48,6 @@ done
 
 [ -z "$FORWARD_SHORT_NAME" ] && FORWARD_SHORT_NAME=$SHORT_NAME
 
-[ -f /etc/opendkim/signing.table ] && cat /etc/opendkim/signing.table > /etc/opendkim/signing.table_new
-echo "*@$DOMAIN $SHORT_NAME" >> /etc/opendkim/signing.table_new
-mv --backup=numbered /etc/opendkim/signing.table_new /etc/opendkim/signing.table
-
 yes "y" | opendkim_add_key -d $DOMAIN -n $SHORT_NAME
 
 [ -f /etc/postfix/virtual ] && cat /etc/postfix/virtual > /etc/postfix/virtual_new

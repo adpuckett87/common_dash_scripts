@@ -26,12 +26,9 @@ apt clean >> $LOG_FILE 2>&1
 TEST_PAGE_AFTER=${FILE_BASE}_after.html
 curl -LSs $SERVER_NAME?noStats -o $TEST_PAGE_AFTER >> $LOG_FILE 2>&1
 
-cmp -s $TEST_PAGE $TEST_PAGE_AFTER || SAME="y"
-grep -q "E: \|W: " $LOG_FILE && ERRORS="y"
-
-if [ -n "$ERRORS" ]; then
+if grep -q "E: \|W: " $LOG_FILE; then
 	mutt -s "ERROR: Upgrade of $SERVER_NAME $(date)" admin@$SERVER_NAME < $LOG_FILE
-elif [ -n "$SAME" ]; then
+elif ! cmp -s $TEST_PAGE $TEST_PAGE_AFTER; then
 	mutt -s "WARNING: Upgrade of $SERVER_NAME completed with different homepage $(date)" admin@$SERVER_NAME < $LOG_FILE
 else
 	mutt -s "SUCCESS: Upgrade $SERVER_NAME $(date)" admin@$SERVER_NAME < $LOG_FILE

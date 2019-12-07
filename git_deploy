@@ -68,3 +68,7 @@ if [ "$CONFIRM" = "y" ]; then
 	ln -snf $OLD_CURRENT_LIB $VHOST_DIR/$SHORT_NAME/current/lib
 	echo You may now run sudo service php7.2-fpm reload
 fi
+read -p "Would you like to remove old directories (y)? " CONFIRM
+if [ "$CONFIRM" = "y" ]; then
+	rm -rf $(ls -dt $VHOST_DIR/$SHORT_NAME/* | tail -n +3)
+fi

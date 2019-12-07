@@ -37,6 +37,12 @@ done
 DKIMNAME=$(echo $SHORT_NAME | tr _ -)
 DKIMNAME=${DKIMNAME}$(date +"%Y%m")
 
+if ! grep -q "*@$DOMAIN $SHORT_NAME\$" /etc/opendkim/signing.table; then
+	[ -f /etc/opendkim/signing.table ] && cat /etc/opendkim/signing.table > /etc/opendkim/signing.table_new
+	echo "*@$DOMAIN $SHORT_NAME" >> /etc/opendkim/signing.table_new
+	mv --backup=numbered /etc/opendkim/signing.table_new /etc/opendkim/signing.table
+fi
+
 opendkim-genkey -s $DKIMNAME -d $DOMAIN
 mv --backup=numbered ./$DKIMNAME.private /etc/dkimkeys/$DKIMNAME.key
 chmod 0600 /etc/dkimkeys/$DKIMNAME.key
