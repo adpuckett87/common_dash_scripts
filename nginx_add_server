@@ -21,6 +21,8 @@ if [ $# -lt 2 ]; then
 	echo "	    Name of host (abbreviation). Required."
 	echo "	-o"
 	echo "	    Origin certificate instead of apex, used with CDNs."
+	echo "	-p"
+	echo "	    Manual challenge with dns. Can be used when don't have access to current server."
 	echo "	-r"
 	echo "	    Redirect to this domain."
 	echo
@@ -44,7 +46,7 @@ LOG_DIR=/var/log/nginx
 ENABLED_DIR=/etc/nginx/sites-enabled/
 VHOST_DIR=/var/www
 
-while getopts cd:i:mn:or: opt
+while getopts cd:i:mn:opr: opt
 do
 	case "$opt" in
 		c) CERT=1;;
@@ -53,6 +55,7 @@ do
 		m) CHALLENGE=--manual;;
 		n) SHORT_NAME=$OPTARG;;
 		o) ORIGIN=origin.;;
+		p) CHALLENGE="--manual --preferred-challenges dns";;
 		r) REDIRECT=$OPTARG;;
 	esac
 done
@@ -69,7 +72,7 @@ else
 	cp --backup=numbered $CERT_DIR/ssl-cert-snakeoil.pem $CERT_DIR/$SHORT_NAME.pem
 	cp --backup=numbered $KEY_DIR/ssl-cert-snakeoil.key $KEY_DIR/$SHORT_NAME.key
 	certbot $CHALLENGE -d $ORIGIN$DOMAIN -d www.$DOMAIN certonly && ln -sf /etc/letsencrypt/live/$ORIGIN$DOMAIN/fullchain.pem $CERT_DIR/$SHORT_NAME.pem && ln -sf /etc/letsencrypt/live/$ORIGIN$DOMAIN/privkey.pem $KEY_DIR/$SHORT_NAME.key
-	if [ "$CHALLENGE" = "--manual" ]; then
+	if [ "$CHALLENGE" = "--manual" ] || [ "$CHALLENGE" = "--manual --preferred-challenges dns" ]; then
 		sed -i "s/authenticator = manual/authenticator = nginx/" /etc/letsencrypt/renewal/$ORIGIN$DOMAIN.conf
 		sed -i "s/manual_public_ip_logging_ok = True/installer = nginx/" /etc/letsencrypt/renewal/$ORIGIN$DOMAIN.conf
 	fi
