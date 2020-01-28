@@ -98,7 +98,7 @@ else
 		mysql_config_editor set --login-path=${DB_HOST}-$DB_USER --host=$DB_HOST --user=$DB_USER --password --skip-warn
 		CONNECT_STRING="--login-path=${DB_HOST}-$DB_USER"
 	else
-		echo "ERROR: You must include either a file with the -f option or a user with the -u option" >&2 && exit 1
+		[ $(id -u) != "0" ] && echo "ERROR: You must include either a file with the -f option or a user with the -u option" >&2 && exit 1
 	fi
 fi
 [ -z "$DB_NAME" ] && echo "ERROR: You must include a database name." >&2 && exit 1
