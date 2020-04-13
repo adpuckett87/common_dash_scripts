@@ -12,7 +12,7 @@ FILE_BASE=/var/log/$(basename "$0")_$(date +"%F_%T")
 LOG_FILE=$FILE_BASE.log
 
 TEST_PAGE=${FILE_BASE}_before.html
-curl -LSs $SERVER_NAME?noStats -o $TEST_PAGE >> $LOG_FILE 2>&1
+curl -LSs $SERVER_NAME -o $TEST_PAGE >> $LOG_FILE 2>&1
 
 echo "apt update" >> $LOG_FILE
 DEBIAN_FRONTEND=noninteractive apt -y update >> $LOG_FILE 2>&1
@@ -24,7 +24,7 @@ echo "\napt clean" >> $LOG_FILE
 apt clean >> $LOG_FILE 2>&1
 
 TEST_PAGE_AFTER=${FILE_BASE}_after.html
-curl -LSs $SERVER_NAME?noStats -o $TEST_PAGE_AFTER >> $LOG_FILE 2>&1
+curl -LSs $SERVER_NAME -o $TEST_PAGE_AFTER >> $LOG_FILE 2>&1
 
 if grep -q "E: \|W: " $LOG_FILE; then
 	mutt -s "ERROR: Upgrade of $SERVER_NAME $(date)" admin@$SERVER_NAME < $LOG_FILE

@@ -2,7 +2,7 @@
 
 VHOST_DIR=/var/www
 
-SITES=$(find /var/www -maxdepth 1 -mindepth 1 -type d ! -name "*-dev" | sort)
+SITES=$(find $VHOST_DIR -maxdepth 1 -mindepth 1 -type d ! -name "*-dev" | sort)
 
 for SITE in $SITES; do
 	VERSIONS=$(ls -I current $SITE | wc -w)
