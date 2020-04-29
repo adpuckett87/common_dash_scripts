@@ -2,7 +2,7 @@
 # Add DKIM key
 # 08/16/17 - Created by Andrew Puckett
 
-if [ $# -lt 2 ]; then
+if [ $# -lt 1 ]; then
 	echo "NAME"
 	echo "	$(basename $0) options"
 	echo
@@ -13,7 +13,7 @@ if [ $# -lt 2 ]; then
 	echo "	-d"
 	echo "	    Domain. Required."
 	echo "	-n"
-	echo "	    Name of host (abbreviation). Required."
+	echo "	    Name of host (abbreviation). Optional."
 	echo
 	echo "AUTHOR"
 	echo "	Andrew Puckett"
@@ -34,7 +34,8 @@ do
 	esac
 done
 
-DKIMNAME=$(echo $SHORT_NAME | tr _ -)
+[ -z "$SHORT_NAME" ] && SHORT_NAME=$DOMAIN
+DKIMNAME=$(echo $SHORT_NAME | tr _. -)
 DKIMNAME=${DKIMNAME}$(date +"%Y%m")
 
 if ! grep -q "*@$DOMAIN $SHORT_NAME\$" /etc/opendkim/signing.table; then

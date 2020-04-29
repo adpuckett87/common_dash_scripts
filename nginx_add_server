@@ -1,7 +1,7 @@
 #!/bin/sh
 # 09/07/17 - Created by Andrew Puckett
 
-if [ $# -lt 2 ]; then
+if [ $# -lt 1 ]; then
 	echo "NAME"
 	echo "	$(basename $0) options"
 	echo
@@ -18,13 +18,15 @@ if [ $# -lt 2 ]; then
 	echo "	-m"
 	echo "	    Manual challenge. Can be used when DNS is pointed to the server yet."
 	echo "	-n"
-	echo "	    Name of host (abbreviation). Required."
+	echo "	    Name of host (abbreviation). Optional."
 	echo "	-o"
-	echo "	    Origin certificate instead of apex, used with CDNs."
+	echo "	    Origin certificate instead of apex, used with CDNs when origin is on the same domain."
 	echo "	-p"
 	echo "	    Manual challenge with dns. Can be used when don't have access to current server."
 	echo "	-r"
 	echo "	    Redirect to this domain."
+	echo "	-s"
+	echo "	    Server name. Optional. Used with CDNs when origin is on a separate domain."
 	echo "	-w"
 	echo "	    Get certificate for www subdomain."
 	echo
@@ -49,7 +51,7 @@ LOG_DIR=/var/log/nginx
 ENABLED_DIR=/etc/nginx/sites-enabled/
 VHOST_DIR=/var/www
 
-while getopts cd:i:mn:opr:w opt
+while getopts cd:i:mn:opr:s:w opt
 do
 	case "$opt" in
 		c) CERT=1;;
@@ -60,13 +62,20 @@ do
 		o) ORIGIN=origin.;;
 		p) CHALLENGE="--manual --preferred-challenges dns";;
 		r) REDIRECT=$OPTARG;;
-		w) WWW="-d www.$DOMAIN";;
+		s) SERVER_NAME=$OPTARG;;
+		w) WWW=-d;;
 	esac
 done
 
 [ -z "$REDIRECT" ] && REDIRECT=$DOMAIN
 [ -z "$DOMAIN" ] && echo "ERROR: Domain is required." >&2 && exit 1
-[ -z "$SHORT_NAME" ] && echo "ERROR: Name is required." >&2 && exit 1
+[ -z "$SHORT_NAME" ] && SHORT_NAME=$DOMAIN
+[ -z "$SERVER_NAME" ] && SERVER_NAME=$DOMAIN
+[ "$WWW" = "-d" ] && WWW="-d www.$DOMAIN"
+
+if [ "$ORIGIN" = "origin." ] || [ "$SERVER_NAME" != "$DOMAIN" ]; then
+  SERVER_NAME="$SERVER_NAME $ORIGIN$DOMAIN"
+fi
 
 if [ $CERT -eq 1 ]; then
 	cp --backup=numbered $INSTALL_DIR/$SHORT_NAME.pem $CERT_DIR/$SHORT_NAME.pem
@@ -96,7 +105,7 @@ cat > $INSTALL_DIR/$SHORT_NAME.conf <<- EOM
 
 	server {
 	    listen 80; #default_server
-	    server_name $DOMAIN www.$DOMAIN portal.$DOMAIN origin.$DOMAIN;
+	    server_name $ORIGIN$DOMAIN www.$DOMAIN;
 	    access_log $LOG_DIR/${SHORT_NAME}_redirect.log combined if=\$loggable;
 	    return 301 https://$REDIRECT\$request_uri;
 	}
@@ -117,7 +126,7 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 
 	server {
 	    listen 443 ssl http2; #default_server
-	    server_name $DOMAIN portal.$DOMAIN origin.$DOMAIN;
+	    server_name $SERVER_NAME;
 	    ssl_certificate $CERT_DIR/$SHORT_NAME.pem;
 	    ssl_certificate_key $KEY_DIR/$SHORT_NAME.key;
 	    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;

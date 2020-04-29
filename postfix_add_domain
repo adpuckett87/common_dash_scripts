@@ -2,7 +2,7 @@
 # Add Domain to Postfix
 # 08/16/17 - Created by Andrew Puckett
 
-if [ $# -lt 2 ]; then
+if [ $# -lt 1 ]; then
 	echo "NAME"
 	echo "	$(basename $0) options"
 	echo
@@ -16,10 +16,8 @@ if [ $# -lt 2 ]; then
 	echo "	    Domain. Required."
 	echo "	-f"
 	echo "	    Forwarding domain."
-	echo "	-g"
-	echo "	    Forwarding name of host (abbreviation). Used with -f."
 	echo "	-n"
-	echo "	    Name of host (abbreviation). Required."
+	echo "	    Name of host (abbreviation or domain). Optional."
 	echo
 	echo "AUTHOR"
 	echo "	Andrew Puckett"
@@ -33,25 +31,24 @@ DOMAIN=
 SHORT_NAME=
 ADMIN_EMAIL=
 FORWARD_DOMAIN=
-FORWARD_SHORT_NAME=
 
-while getopts a:d:f:g:n: opt
+while getopts a:d:f:n: opt
 do
 	case "$opt" in
 		a) ADMIN_EMAIL=$OPTARG;;
 		d) DOMAIN=$OPTARG;;
 		f) FORWARD_DOMAIN=$OPTARG;;
-		g) FORWARD_SHORT_NAME=$OPTARG;;
 		n) SHORT_NAME=$OPTARG;;
 	esac
 done
 
-[ -z "$FORWARD_SHORT_NAME" ] && FORWARD_SHORT_NAME=$SHORT_NAME
+[ -z "$DOMAIN" ] && echo "ERROR: Domain is required." >&2 && exit 1
+[ -z "$SHORT_NAME" ] && SHORT_NAME=$DOMAIN
 
 yes "y" | opendkim_add_key -d $DOMAIN -n $SHORT_NAME
 
 [ -f /etc/postfix/virtual ] && cat /etc/postfix/virtual > /etc/postfix/virtual_new
-echo $DOMAIN $FORWARD_SHORT_NAME >> /etc/postfix/virtual_new
+echo $DOMAIN -- >> /etc/postfix/virtual_new
 if [ -n "$FORWARD_DOMAIN" ]; then
 	echo @$DOMAIN @$FORWARD_DOMAIN >> /etc/postfix/virtual_new
 else

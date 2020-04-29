@@ -174,12 +174,13 @@ if [ -n "$MYSQL_USER" ]; then
 	fi
 
 	if [ $CRON -eq 1 ]; then
-		cat > /etc/cron.daily/mysql_dump_$DB_NAME <<- EOM
+		DB_NAME_DASH=$(echo $DB_NAME | tr . -)
+		cat > /etc/cron.daily/mysql_dump_$DB_NAME_DASH <<- EOM
 			#!/bin/sh
 			{
 			mysql_admin -e -f /etc/mysql/${DB_NAME}-$MYSQL_USER.cnf -n $DB_NAME -d /var/backups/$DB_NAME/mysql/\$(date +%Y%m%d%H%M%S) -b 14
 			} | logger -t $(basename "$0")
 		EOM
-		chmod +x /etc/cron.daily/mysql_dump_$DB_NAME
+		chmod +x /etc/cron.daily/mysql_dump_$DB_NAME_DASH
 	fi
 fi

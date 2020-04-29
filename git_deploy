@@ -14,7 +14,7 @@ if [ $# -lt 2 ]; then
 	echo "	-d"
 	echo "	    Directory to use. Default based on date."
 	echo "	-n"
-	echo "	    Name of host (abbreviation). Required."
+	echo "	    Name of host (abbreviation or domain). Required."
 	echo "	-r"
 	echo "	    Repo name."
 	echo
@@ -53,6 +53,13 @@ until false; do
 	git checkout $VERSION && break
 done
 git status
+
+if [ ! -d "$VHOST_DIR/$SHORT_NAME/current/lib" ]; then
+	ln -snf $VHOST_DIR/$SHORT_NAME/$DIR/ext $VHOST_DIR/$SHORT_NAME/current/ext
+	ln -snf $VHOST_DIR/$SHORT_NAME/$DIR/lib $VHOST_DIR/$SHORT_NAME/current/lib
+	echo You may now run sudo /var/www/$SHORT_NAME/$DIR/setup/install -d $SHORT_NAME -s DOMAIN
+	return
+fi
 
 OLD_CURRENT_EXT=$(ls -l $VHOST_DIR/$SHORT_NAME/current/ext | awk '{print $NF}')
 OLD_CURRENT_LIB=$(ls -l $VHOST_DIR/$SHORT_NAME/current/lib | awk '{print $NF}')
