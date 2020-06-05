@@ -18,6 +18,8 @@ if [ $# -lt 1 ]; then
 	echo "	    Forwarding domain."
 	echo "	-n"
 	echo "	    Name of host (abbreviation or domain). Optional."
+	echo "	-p"
+	echo "	    Email address to forward postmaster mail to. Optional."
 	echo
 	echo "AUTHOR"
 	echo "	Andrew Puckett"
@@ -31,14 +33,16 @@ DOMAIN=
 SHORT_NAME=
 ADMIN_EMAIL=
 FORWARD_DOMAIN=
+POSTMASTER=
 
-while getopts a:d:f:n: opt
+while getopts a:d:f:n:p: opt
 do
 	case "$opt" in
 		a) ADMIN_EMAIL=$OPTARG;;
 		d) DOMAIN=$OPTARG;;
 		f) FORWARD_DOMAIN=$OPTARG;;
 		n) SHORT_NAME=$OPTARG;;
+		p) POSTMASTER=$OPTARG;;
 	esac
 done
 
@@ -54,12 +58,17 @@ if [ -n "$FORWARD_DOMAIN" ]; then
 else
 	for ACCT in abuse accounts contact ftp hostmaster info list mail marketing postmaster root sales security social support webmaster www; do
 		case "$ACCT" in
-			accounts|postmaster|root|security|webmaster) echo $ACCT@$DOMAIN admin@$DOMAIN >> /etc/postfix/virtual_new;;
+			accounts|root|security|webmaster) echo $ACCT@$DOMAIN admin@$DOMAIN >> /etc/postfix/virtual_new;;
 			mail|marketing|sales) echo $ACCT@$DOMAIN info@$DOMAIN >> /etc/postfix/virtual_new;;
-			abuse|contact|info|list|social|support) echo $ACCT@$DOMAIN postmaster@$DOMAIN >> /etc/postfix/virtual_new;;
-			ftp|hostmaster|www) echo $ACCT@$DOMAIN webmaster@$DOMAIN >> /etc/postfix/virtual_new;;
+			abuse|contact|ftp|hostmaster|info|list|social|support|www) echo $ACCT@$DOMAIN webmaster@$DOMAIN >> /etc/postfix/virtual_new;;
 		esac
 	done
+	if [ -n "$POSTMASTER" ]; then
+		echo postmaster@$DOMAIN $POSTMASTER >> /etc/postfix/virtual_new
+	else
+		echo postmaster@$DOMAIN postmaster-$SHORT_NAME@localhost >> /etc/postfix/virtual_new
+		echo "postmaster-$SHORT_NAME: \"| SERVER_NAME=$DOMAIN php /var/www/$SHORT_NAME/current/lib/_8n/controllers/logevent.php POSTMASTER\"" >> /etc/aliases
+	fi
 	echo no-reply@$DOMAIN devnull@localhost >> /etc/postfix/virtual_new
 	echo listunsubscribe@$DOMAIN listunsubscribe-$SHORT_NAME@localhost >> /etc/postfix/virtual_new
 	echo "listunsubscribe-$SHORT_NAME: \"| php /var/www/$SHORT_NAME/current/lib/_8n/emailmarketing/controllers/listunsubscribe.php\"" >> /etc/aliases
