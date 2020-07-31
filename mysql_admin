@@ -3,8 +3,6 @@
 # 03/02/17 - Changed to getopts style options and added other improvements, integrated user creation
 # 09/08/17 - Fixed a few user creation bugs, added cron script
 
-MYSQL_OPTS="--add-drop-table --add-locks --create-options --dump-date --extended-insert --no-create-db --quick --quote-names --routines --single-transaction --triggers --tz-utc"
-
 if [ $# -lt 2 ]; then
 	echo "NAME"
 	echo "	$(basename $0) options"
@@ -35,7 +33,7 @@ if [ $# -lt 2 ]; then
 	echo "	-i"
 	echo "		Import mode. Will import gzip'd files."
 	echo "	-o"
-	echo "		Extra options to pass to mysqldump on export. Will be appended to \$MYSQL_OPTS. e.g. --no-data"
+	echo "		Extra options to pass to mysqldump on export. Will be appended to \$MYSQLDUMP_OPTS. e.g. --no-data"
 	echo "	-r"
 	echo "		Will replace an existing database if present on import."
 	echo
@@ -89,7 +87,7 @@ done
 
 [ $SILENT -eq 1 ] && exec 3>&1 1> /dev/null 2>&1
 
-MYSQL_OPTS="--add-drop-table --add-locks --create-options --dump-date --extended-insert --no-create-db --quick --quote-names --routines --single-transaction --triggers --tz-utc $MYSQL_ADD_OPTS"
+MYSQLDUMP_OPTS="--add-drop-table --add-locks --create-options --dump-date --extended-insert --no-create-db --no-tablespaces --quick --quote-names --routines --single-transaction --triggers --tz-utc $MYSQL_ADD_OPTS"
 [ -n "$DB_HOST" ] || DB_HOST=localhost
 if [ -n "$FILE" ] && [ -f $FILE ]; then
 	CONNECT_STRING="--defaults-file=$FILE"
@@ -126,7 +124,7 @@ elif [ $EXPORT -eq 1 ]; then
 
 	for t in $TABLES; do
 		echo "DUMPING TABLE: $DB_NAME.$t"
-		mysqldump $CONNECT_STRING $MYSQL_OPTS $DB_NAME $t | sed -e 's/DEFINER[ ]*=[ ]*`[^*]*`@`[^*]*`/DEFINER=CURRENT_USER/g' | gzip > $EXPORT_DIR/$t.sql.gz
+		mysqldump $CONNECT_STRING $MYSQLDUMP_OPTS $DB_NAME $t | sed -e 's/DEFINER[ ]*=[ ]*`[^*]*`@`[^*]*`/DEFINER=CURRENT_USER/g' | gzip > $EXPORT_DIR/$t.sql.gz
 		i=$((i+1))
 	done
 
