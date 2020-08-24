@@ -2,6 +2,8 @@
 # Add Domain to Postfix
 # 08/16/17 - Created by Andrew Puckett
 
+# https://www.hardenize.com/blog/mta-sts
+
 if [ $# -lt 1 ]; then
 	echo "NAME"
 	echo "	$(basename $0) options"

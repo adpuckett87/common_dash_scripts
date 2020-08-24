@@ -6,7 +6,7 @@ if [ $# -lt 1 ]; then
 	echo "	$(basename $0) options"
 	echo
 	echo "DESCRIPTION"
-	echo "	$(basename $0) is used to add a vhost to apache."
+	echo "	$(basename $0) is used to add a vhost to nginx."
 	echo
 	echo "OPTIONS"
 	echo "	-c"
@@ -135,7 +135,7 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 
 	    root $VHOST_DIR/$SHORT_NAME/current;
 
-	    #log_format  custom '\$time_local \$request_time \$remote_addr "\$request" \$status  "\$http_referer" "\$http_user_agent"';
+	    #log_format custom '\$time_local \$request_time \$remote_addr "\$request" \$request_length \$status \$bytes_sent "\$http_referer" "\$http_user_agent"';
 	    error_log $LOG_DIR/${SHORT_NAME}_error.log warn;
 	    access_log $LOG_DIR/${SHORT_NAME}_access.log custom;
 
@@ -146,7 +146,7 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 	    location @frontcontroller {
 	        expires off;
 	        try_files /lib/_8n/frontcontroller.php =404;
-	        fastcgi_pass unix:/run/php/php7.2-fpm.sock;
+	        fastcgi_pass unix:/run/php/php7.4-fpm.sock;
 	        include fastcgi.conf;
 	    }
 
