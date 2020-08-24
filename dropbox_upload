@@ -10,7 +10,7 @@ if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
 	echo "	$(basename $0) options"
 	echo
 	echo "DESCRIPTION"
-	echo "	$(basename $0) is used to upload a folder to Dropbox API."
+	echo "	$(basename $0) is used to upload a directory to Dropbox API."
 	echo
 	echo "OPTIONS"
 	echo "	-d"

@@ -153,7 +153,7 @@ if [ -n "$MYSQL_USER" ]; then
 		echo
 	fi
 
-	mysql $CONNECT_STRING -NBA -e "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASS}' WITH GRANT OPTION;"
+	mysql $CONNECT_STRING -NBA -e "CREATE USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASS}'; GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${MYSQL_USER}'@'localhost' WITH GRANT OPTION;"
 
 	[ $LOGIN_PATH -eq 1 ] && mysql_config_editor set --login-path=${DB_HOST}-$MYSQL_USER --host=$DB_HOST --user=$MYSQL_USER --password --skip-warn
 	if [ -w "/etc/mysql" ]; then

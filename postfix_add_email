@@ -14,6 +14,8 @@ if [ $# -lt 2 ]; then
 	echo "	    Domain. Required."
 	echo "	-e"
 	echo "	    Email address (e.g. firstname). This will be forwarded to admin unless -f is used. Required."
+	echo "	-i"
+	echo "	    Don't setup sasl. Can be used if importing the user from the sasldb2 file."
 	echo "	-f"
 	echo "	    Forward the extra email address (e.g. example@gmail.com)."
 	echo "	-p"
@@ -31,13 +33,15 @@ DOMAIN=
 EMAIL=
 FORWARD=
 CREATE_PASS=0
+SASL=1
 
-while getopts d:e:f:p opt
+while getopts d:e:f:ip opt
 do
 	case "$opt" in
 		d) DOMAIN=$OPTARG;;
 		e) EMAIL=$OPTARG;;
 		f) FORWARD=$OPTARG;;
+		i) SASL=0;;
 		p) CREATE_PASS=1;;
 	esac
 done
@@ -48,6 +52,8 @@ done
 echo $EMAIL@$DOMAIN $FORWARD >> /etc/postfix/virtual_new
 mv --backup=numbered /etc/postfix/virtual_new /etc/postfix/virtual
 postmap /etc/postfix/virtual
+
+[ $SASL -eq 0 ] && exit
 
 if [ $CREATE_PASS -eq 1 ]; then
 	PASS=$(openssl rand -base64 16 | tr / +)

@@ -6,7 +6,7 @@ if [ "$1" = "-h" ] || [ "$1" = "--help" ] || [ $# -lt 1 ]; then
 	echo "	$(basename $0) options"
 	echo
 	echo "DESCRIPTION"
-	echo "	$(basename $0) is used to rename files in a folder."
+	echo "	$(basename $0) is used to rename files in a directory."
 	echo
 	echo "OPTIONS"
 	echo "	-d"
