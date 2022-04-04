@@ -4,6 +4,7 @@
 # 03/06/17 - Zip auth.log and syslog before uploading
 # 02/03/19 - Skip journal logs
 # 01/28/20 - Zip all logs before uploading and improve logging
+# 04/04/22 - Use Oauth2 because dropbox is deprecating long-term tokens
 
 if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
 	echo "NAME"
@@ -11,6 +12,16 @@ if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
 	echo
 	echo "DESCRIPTION"
 	echo "	$(basename $0) is used to upload a directory to Dropbox API."
+	echo "	Start at https://www.dropbox.com/developers/apps and create an app. Add all file and folder permissions."
+	echo
+	echo "	Use https://www.dropbox.com/oauth2/authorize?client_id=<APP_KEY>&response_type=code and get code."
+	echo "	Then use curl https://api.dropbox.com/oauth2/token \\"
+	echo "		-d code=<AUTHORIZATION_CODE> \\"
+	echo "		-d grant_type=authorization_code \\"
+	echo "		-d redirect_uri=http://localhost \\"
+	echo "		-u <APP_KEY>:<APP_SECRET>"
+	echo "	Copy refresh_token"
+	echo "	Put APP_KEY, APP_SECRET, REFRESH_TOKEN, DBTOKEN=, and EXPIRES=0 in /etc/dropbox"
 	echo
 	echo "OPTIONS"
 	echo "	-d"
@@ -39,12 +50,27 @@ do
 done
 
 [ "$DBTOKEN" = 1 ] && read -p "Token: " DBTOKEN
-[ -n "$DBTOKEN" ] || DBTOKEN=$(cat /etc/dropbox)
-[ -z "$DBTOKEN" ] && echo "ERROR: No Access Token Found." >&2 && exit 1
+[ -n "$DBTOKEN" ] || . /etc/dropbox
+[ -z "$DBTOKEN" ] && [ -z "$REFRESH_TOKEN" ] && echo "ERROR: No Access Token Found." >&2 && exit 1
 [ "$CURLOPTS" = "-s" ] && CURLOUT=/dev/null
+
+if [ -n "$EXPIRES" ] && [ $EXPIRES -le $(($(date +%s)+120)) ]; then
+	JSON=$(curl $CURLOPTS https://api.dropbox.com/oauth2/token -d grant_type=refresh_token -d refresh_token=$REFRESH_TOKEN -u $APP_KEY:$APP_SECRET)
+	ACCESS_TOKEN=$(echo $JSON | jq -r ".access_token")
+	EXPIRES=$(echo $JSON | jq -r ".expires_in")
+	if [ -n "$ACCESS_TOKEN" ] && [ -n "$EXPIRES" ]; then
+		DBTOKEN=$ACCESS_TOKEN
+		EXPIRES=$(($(date +%s)+$EXPIRES))
+		sed -i "/^DBTOKEN/ s/.*/DBTOKEN=$DBTOKEN/" /etc/dropbox
+		sed -i "/^EXPIRES/ s/.*/EXPIRES=$EXPIRES/" /etc/dropbox
+	else
+		echo "ERROR: Access Token Refresh failed." >&2 && exit 1
+	fi
+fi
 
 [ -f $DBLOCATION/.updated ] && FINDTESTS="-newer $DBLOCATION/.updated"
 
+sleep 15 # we can catch files that were just updated via cron at hh:mm:00
 DATE=$(date -R)
 FILES=$(find -L $DBLOCATION -type f $FINDTESTS)
 touch -d "$DATE" $DBLOCATION/.updated
@@ -52,7 +78,7 @@ echo "Uploading $(echo $FILES | wc -w) files to Dropbox"
 
 IFS="$(printf '\n\t')"
 for FILE in $FILES; do
-  REMOVE=0
+	REMOVE=0
 	if [ -n "$(echo "$FILE" | grep -E "$DBLOCATION/log/journal/")" ] || [ ! -f $FILE ]; then
 		continue
 	fi
