@@ -27,11 +27,11 @@ TEST_PAGE_AFTER=${FILE_BASE}_after.html
 curl -LSs $SERVER_NAME -o $TEST_PAGE_AFTER >> $LOG_FILE 2>&1
 
 if grep -q "E: \|W: " $LOG_FILE; then
-	mutt -s "ERROR: Upgrade of $SERVER_NAME $(date)" admin@$SERVER_NAME < $LOG_FILE
+	(printf "To: admin@$SERVER_NAME\nSubject: ERROR: Upgrade of $SERVER_NAME $(date)\n\n"; cat $LOG_FILE) | sendmail -t
 elif ! cmp -s $TEST_PAGE $TEST_PAGE_AFTER; then
-	mutt -s "WARNING: Upgrade of $SERVER_NAME completed with different homepage $(date)" admin@$SERVER_NAME < $LOG_FILE
+	(printf "To: admin@$SERVER_NAME\nSubject: WARNING: Upgrade of $SERVER_NAME completed with different homepage $(date)\n\n"; cat $LOG_FILE) | sendmail -t
 else
-	mutt -s "SUCCESS: Upgrade $SERVER_NAME $(date)" admin@$SERVER_NAME < $LOG_FILE
+	(printf "To: admin@$SERVER_NAME\nSubject: SUCCESS: Upgrade $SERVER_NAME $(date)\n\n"; cat $LOG_FILE) | sendmail -t
 	rm -f $TEST_PAGE
 	rm -f $TEST_PAGE_AFTER
 fi

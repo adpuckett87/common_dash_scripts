@@ -146,7 +146,7 @@ if [ "$REDIRECT" = "$DOMAIN" ]; then
 	    location @frontcontroller {
 	        expires off;
 	        try_files /lib/_8n/frontcontroller.php =404;
-	        fastcgi_pass unix:/run/php/php7.4-fpm.sock;
+	        fastcgi_pass unix:/run/php/php8.1-fpm.sock;
 	        include fastcgi.conf;
 	    }
 

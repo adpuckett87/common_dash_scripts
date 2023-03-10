@@ -68,13 +68,13 @@ if [ "$CONFIRM" = "y" ]; then
 	ln -snf $VHOST_DIR/$SHORT_NAME/$DIR/ext $VHOST_DIR/$SHORT_NAME/current/ext
 	ln -snf $VHOST_DIR/$SHORT_NAME/$DIR/lib $VHOST_DIR/$SHORT_NAME/current/lib
 	php $VHOST_DIR/$SHORT_NAME/current/lib/_8n/controllers/deploymentcontroller.php
-	echo You may now run sudo service php7.4-fpm reload
+	echo You may now run sudo service php8.1-fpm reload
 fi
 read -p "Would you like to go back (y)? " CONFIRM
 if [ "$CONFIRM" = "y" ]; then
 	ln -snf $OLD_CURRENT_EXT $VHOST_DIR/$SHORT_NAME/current/ext
 	ln -snf $OLD_CURRENT_LIB $VHOST_DIR/$SHORT_NAME/current/lib
-	echo You may now run sudo service php7.4-fpm reload
+	echo You may now run sudo service php8.1-fpm reload
 fi
 read -p "Would you like to remove old directories (y)? " CONFIRM
 if [ "$CONFIRM" = "y" ]; then

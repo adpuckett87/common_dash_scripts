@@ -3,4 +3,8 @@
 STDIN=$(cat)
 DOMAIN=$(echo "$STDIN" | awk '/Return-Path: / { i++ }  i > 1 && j < 1 { split($2,a,"@"); sub(">","",a[2]); print a[2]; j++ }')
 #SHORT_NAME=$(grep "^$DOMAIN " /etc/postfix/virtual | cut -d' ' -f2)
-echo "$STDIN" | php /var/www/$DOMAIN/current/lib/_8n/emailmarketing/controllers/bounce.php
+if [ -f "/var/www/$DOMAIN/current/lib/_8n/emailmarketing/controllers/bounce.php" ]; then
+  echo "$STDIN" | php /var/www/$DOMAIN/current/lib/_8n/emailmarketing/controllers/bounce.php
+else
+  printf "To: postmaster@$(cat /etc/hostname)\nSubject: Bounced email for $DOMAIN\n\n$STDIN" | /usr/sbin/sendmail -t
+fi

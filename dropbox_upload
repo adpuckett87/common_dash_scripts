@@ -68,7 +68,7 @@ if [ -n "$EXPIRES" ] && [ $EXPIRES -le $(($(date +%s)+120)) ]; then
 	fi
 fi
 
-[ -f $DBLOCATION/.updated ] && FINDTESTS="-newer $DBLOCATION/.updated"
+[ -f $DBLOCATION/.updated ] && FINDTESTS="-cnewer $DBLOCATION/.updated"
 
 sleep 15 # we can catch files that were just updated via cron at hh:mm:00
 DATE=$(date -R)

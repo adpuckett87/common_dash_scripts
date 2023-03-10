@@ -46,7 +46,8 @@ if [ "$1" = "-q" ]; then
 fi
 
 if [ "$1" = "-e" ]; then
-	cat /proc/loadavg | awk '{printf "%-20s %s\n", "loadavg", $1*100}'
+	$0 -q && echo OK || echo WARNING
+	cat /proc/loadavg | awk '{printf "\n%-20s %s\n", "loadavg", $1*100}'
 	free | awk '/Mem:/ {printf "%-20s %s\n", "mem%", 100*($2-$7)/$2}'
 	free | awk '/Swap:/ {if($2 != 0){printf "%-20s %s\n", "swap%", 100*$3/$2}}'
 	df | awk '/^\/dev/ {if(index($1, "loop") == 0){sub("/dev/","",$1);sub("%","",$5);printf "%-20s %s\n\n", $1"_used%", $5}}'

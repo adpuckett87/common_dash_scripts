@@ -87,7 +87,7 @@ done
 
 [ $SILENT -eq 1 ] && exec 3>&1 1> /dev/null 2>&1
 
-MYSQLDUMP_OPTS="--add-drop-table --add-locks --create-options --dump-date --extended-insert --no-create-db --no-tablespaces --quick --quote-names --routines --single-transaction --triggers --tz-utc $MYSQL_ADD_OPTS"
+MYSQLDUMP_OPTS="--add-drop-table --add-locks --create-options --extended-insert --no-create-db --no-tablespaces --quick --quote-names --routines --single-transaction --skip-dump-date --triggers --tz-utc $MYSQL_ADD_OPTS"
 [ -n "$DB_HOST" ] || DB_HOST=localhost
 if [ -n "$FILE" ] && [ -f $FILE ]; then
 	CONNECT_STRING="--defaults-file=$FILE"
@@ -133,7 +133,7 @@ fi
 
 if [ $BACKUPS -gt 0 ]; then
 	[ -n "$DIR" ] && DIR=$(dirname $DIR) || DIR=.
-	find $DIR/* -type d -mtime +$BACKUPS -exec rm -r {} +
+	find $DIR/2* -type d -mtime +$BACKUPS -exec rm -r {} +
 fi
 
 if [ -n "$MYSQL_USER" ]; then
@@ -176,7 +176,27 @@ if [ -n "$MYSQL_USER" ]; then
 		cat > /etc/cron.daily/mysql_dump_$DB_NAME_DASH <<- EOM
 			#!/bin/sh
 			{
-			mysql_admin -e -f /etc/mysql/${DB_NAME}-$MYSQL_USER.cnf -n $DB_NAME -d /var/backups/$DB_NAME/mysql/\$(date +%Y%m%d%H%M%S) -b 14
+			DIR=/var/backups/$DB_NAME/mysql
+			MASTER=\$DIR/master
+			BACKUP_DIR=\$MASTER
+			[ -d "\$BACKUP_DIR" ] && BACKUP_DIR=\$(mktemp -d)
+			mysql_admin -e -f /etc/mysql/${DB_NAME}-$MYSQL_USER.cnf -n $DB_NAME -d \$BACKUP_DIR
+			if [ "\$(basename \$BACKUP_DIR)" != "master" ]; then
+			    for f in \$BACKUP_DIR/*; do
+			        FILE=\$(basename "\$f")
+			        if ! cmp -s \$f \$MASTER/\$FILE; then
+			            mv \$f \$MASTER/\$FILE.tmp
+			            if [ -f "\$MASTER/\$FILE" ]; then
+			                DATE=\$(date -d "@\$(stat -c '%Y' \$MASTER/\$FILE)" '+%Y%m%d%H%M00')
+			                mkdir -p \$DIR/\$DATE
+			                mv \$MASTER/\$FILE \$DIR/\$DATE/\$FILE
+			            fi
+			            mv \$MASTER/\$FILE.tmp \$MASTER/\$FILE
+			        fi
+			    done
+			    rm -R \$BACKUP_DIR
+			fi
+			find \$DIR/2* -type d -mtime +14 -exec rm -r {} +
 			} | logger -t $(basename "$0")
 		EOM
 		chmod +x /etc/cron.daily/mysql_dump_$DB_NAME_DASH
